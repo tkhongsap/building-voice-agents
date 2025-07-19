@@ -360,12 +360,54 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Powered by [ElevenLabs](https://elevenlabs.io/) for voice synthesis
 - Based on the [DeepLearning.AI Building Voice Agents](https://www.deeplearning.ai/) course
 
-## Course Materials
+## 📚 Documentation & Learning Resources
+
+### Complete Documentation Suite
+
+This repository includes comprehensive documentation for learning and implementing voice agents:
+
+#### 🚀 **Quick Learning Path**
+1. **[Complete Voice Agent Guide](docs/00-complete-voice-agent-guide.md)** - Comprehensive combined reference
+2. **[Quick Start Guide](docs/01-quick-start-guide.md)** - Get running in 15 minutes
+3. **[Setup Guide](docs/02-setup-guide.md)** - Environment configuration
+
+#### 🏗️ **Architecture & Design**
+4. **[Voice Agent Architecture](docs/03-voice-agent-architecture.md)** - System design patterns
+5. **[Core Components Guide](docs/04-core-components-guide.md)** - STT, LLM, TTS, VAD deep dive
+
+#### 🔧 **Implementation & Advanced Topics**
+6. **[Implementation Tutorial](docs/05-implementation-tutorial.md)** - Complete step-by-step walkthrough
+7. **[Turn Detection Guide](docs/06-turn-detection-guide.md)** - Conversation management
+8. **[Performance Optimization](docs/07-performance-optimization.md)** - Production tuning
+
+#### 🌐 **Production & Applications**
+9. **[Applications Guide](docs/08-applications-guide.md)** - Industry use cases
+10. **[LiveKit Reference](docs/09-livekit-reference.md)** - Complete API documentation
+
+### 📖 **Learning Recommendations**
+
+**For Beginners:**
+- Start with [Quick Start Guide](docs/01-quick-start-guide.md) to get immediate results
+- Follow [Setup Guide](docs/02-setup-guide.md) for proper configuration
+- Study [Architecture Guide](docs/03-voice-agent-architecture.md) for foundational understanding
+
+**For Developers:**
+- Deep dive into [Core Components](docs/04-core-components-guide.md) for technical details
+- Follow [Implementation Tutorial](docs/05-implementation-tutorial.md) for complete walkthrough
+- Master [Turn Detection](docs/06-turn-detection-guide.md) for natural conversations
+
+**For Production:**
+- Optimize with [Performance Guide](docs/07-performance-optimization.md)
+- Explore [Applications Guide](docs/08-applications-guide.md) for industry patterns
+- Reference [LiveKit Documentation](docs/09-livekit-reference.md) for complete API details
+
+### 🎓 **Course Materials**
 
 This repository also contains the original course materials from DeepLearning.AI in the `deeplearning-ai/` folder:
 
 - **Lesson 4**: Voice Agent Components (`deeplearning-ai/L4/`)
 - **Lesson 5**: Optimizing Latency (`deeplearning-ai/L5/`)
+- **Course Transcript**: Complete spoken content (`deeplearning-ai/recorded-courses.txt`)
 - **Appendix**: Tips and Help (`deeplearning-ai/Appendix–Tips_Help_and_Download/`)
 
-These materials provide the educational foundation for understanding voice agent development and complement the practical implementation in this repository.
+These materials provide the educational foundation for understanding voice agent development and complement the practical implementation guides.
