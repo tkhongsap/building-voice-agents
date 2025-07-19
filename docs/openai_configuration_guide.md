@@ -22,10 +22,8 @@ For a minimal OpenAI-focused setup, you only need:
 - **Alternative**: `gpt-4o-mini` (older but still good)
 
 ### TTS (Text-to-Speech)
-OpenAI doesn't provide TTS API yet, so choose one:
-- **Option 1**: ElevenLabs (requires ElevenLabs API key)
-- **Option 2**: Azure TTS (requires Azure subscription)
-- **Option 3**: AWS Polly (requires AWS credentials)
+- **Primary**: ElevenLabs (best quality, requires ElevenLabs API key)
+- **Fallback**: OpenAI TTS (cost-effective, uses same OpenAI API key)
 
 ### VAD (Voice Activity Detection)
 - **Primary**: WebRTC VAD (no API key needed)
@@ -63,9 +61,30 @@ vad_config = WebRTCVADConfig(
     sample_rate=16000
 )
 
+# TTS Configuration - ElevenLabs primary, OpenAI fallback
+from components.tts.elevenlabs_tts import ElevenLabsTTSProvider, ElevenLabsTTSConfig
+from components.tts.openai_tts import OpenAITTSProvider, OpenAITTSConfig
+
+# Primary TTS: ElevenLabs (best quality)
+elevenlabs_config = ElevenLabsTTSConfig(
+    api_key="your-elevenlabs-api-key",
+    voice_id="your-preferred-voice-id",
+    model="eleven_monolingual_v1"
+)
+
+# Fallback TTS: OpenAI (cost-effective)
+openai_tts_config = OpenAITTSConfig(
+    api_key="your-openai-api-key",  # Same as STT/LLM
+    model="tts-1",  # or "tts-1-hd" for higher quality
+    voice="alloy",  # alloy, echo, fable, onyx, nova, shimmer
+    response_format="mp3"
+)
+
 # Create providers
 stt_provider = OpenAISTTProvider(stt_config)
 llm_provider = OpenAILLMProvider(llm_config)  
+tts_provider = ElevenLabsTTSProvider(elevenlabs_config)  # Primary
+tts_fallback = OpenAITTSProvider(openai_tts_config)     # Fallback
 vad_provider = WebRTCVADProvider(vad_config)
 ```
 
@@ -75,15 +94,9 @@ vad_provider = WebRTCVADProvider(vad_config)
 # Required for OpenAI pipeline
 OPENAI_API_KEY=sk-proj-your-openai-api-key-here
 
-# Optional for TTS (choose one)
+# Required for best TTS quality
 ELEVENLABS_API_KEY=your-elevenlabs-key
-# OR
-AZURE_SPEECH_KEY=your-azure-key
-AZURE_SPEECH_REGION=your-region
-# OR  
-AWS_ACCESS_KEY_ID=your-aws-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret
-AWS_REGION=us-west-2
+# OpenAI TTS automatically uses OPENAI_API_KEY as fallback
 ```
 
 ## 🚀 Complete Pipeline Setup
@@ -105,7 +118,7 @@ pipeline = StreamingAudioPipeline(
     config=pipeline_config,
     stt_provider=stt_provider,      # OpenAI Whisper
     llm_provider=llm_provider,      # OpenAI GPT-4.1-mini
-    tts_provider=tts_provider,      # Your chosen TTS provider
+    tts_provider=tts_provider,      # ElevenLabs primary
     vad_provider=vad_provider       # WebRTC VAD
 )
 
@@ -153,10 +166,13 @@ global_error_handler.fallback_configs["llm"].fallback_providers = [
     "local_llm"        # Fallback 2 (local model)
 ]
 
+global_error_handler.fallback_configs["tts"].fallback_providers = [
+    "elevenlabs",      # Primary (best quality)
+    "openai"           # Fallback (cost-effective, same API key)
+]
+
 global_error_handler.fallback_configs["stt"].fallback_providers = [
-    "openai_whisper",  # Primary  
-    "azure_speech",    # Fallback 1 (if you have Azure API key)
-    "google_speech"    # Fallback 2 (if you have Google API key)
+    "openai_whisper"   # Primary (can add others if needed)
 ]
 ```
 
@@ -205,10 +221,12 @@ With this OpenAI-focused configuration, you should achieve:
 
 ## 🌟 Benefits of This Setup
 
-✅ **Cost-Effective**: GPT-4.1-mini is ~60% cheaper than GPT-4o
-✅ **High Performance**: Latest models with better capabilities  
-✅ **Minimal Dependencies**: Only need OpenAI API key for core functionality
+✅ **Best Quality**: ElevenLabs for premium voice synthesis
+✅ **Cost-Effective**: OpenAI TTS fallback using same API key  
+✅ **High Performance**: GPT-4.1-mini ~60% cheaper than GPT-4o
+✅ **Simplified Stack**: Only 2 TTS providers instead of 4
+✅ **Minimal API Keys**: OpenAI + ElevenLabs covers everything
 ✅ **Production Ready**: Full error handling and monitoring
-✅ **Scalable**: Built-in fallback mechanisms for reliability
+✅ **Optimal Fallback**: Quality → Cost-effective progression
 
-This configuration gives you a production-ready voice agent pipeline focused on OpenAI services while maintaining the flexibility to add other providers as needed.
+This configuration gives you the best of both worlds: **premium quality with cost-effective fallbacks** in a simplified, production-ready stack.

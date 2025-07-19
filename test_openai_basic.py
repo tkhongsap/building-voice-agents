@@ -184,13 +184,18 @@ def test_openai_provider_imports():
     except ImportError as e:
         imports_successful["openai_llm"] = f"Failed: {e}"
     
-    # Note: We don't have OpenAI TTS implementation (they don't have TTS API yet)
-    # but we have other TTS providers
+    # TTS providers: ElevenLabs primary, OpenAI fallback
     try:
         from components.tts.elevenlabs_tts import ElevenLabsTTSProvider
-        imports_successful["alternative_tts"] = True
+        imports_successful["elevenlabs_tts"] = True
     except ImportError as e:
-        imports_successful["alternative_tts"] = f"Failed: {e}"
+        imports_successful["elevenlabs_tts"] = f"Failed: {e}"
+    
+    try:
+        from components.tts.openai_tts import OpenAITTSProvider
+        imports_successful["openai_tts"] = True
+    except ImportError as e:
+        imports_successful["openai_tts"] = f"Failed: {e}"
     
     return imports_successful
 
