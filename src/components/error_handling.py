@@ -137,10 +137,10 @@ class ErrorHandler:
             max_retries=3
         )
         
-        # TTS fallback: try alternative providers
+        # TTS fallback: ElevenLabs primary, OpenAI fallback
         self.fallback_configs["tts"] = FallbackConfig(
             strategy=FallbackStrategy.FALLBACK_PROVIDER,
-            fallback_providers=["elevenlabs", "azure_speech", "aws_polly"],
+            fallback_providers=["elevenlabs", "openai"],
             max_retries=2
         )
         

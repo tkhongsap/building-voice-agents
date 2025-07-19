@@ -264,19 +264,12 @@ def test_subtask_1_9_to_1_12_tts_implementations():
     except ImportError:
         implementations["elevenlabs_tts"] = False
     
-    # Test Azure TTS implementation (1.10)
+    # Test OpenAI TTS implementation (1.10)
     try:
-        from components.tts.azure_tts import AzureTTSProvider, AzureTTSConfig
-        implementations["azure_tts"] = True
+        from components.tts.openai_tts import OpenAITTSProvider, OpenAITTSConfig
+        implementations["openai_tts"] = True
     except ImportError:
-        implementations["azure_tts"] = False
-    
-    # Test AWS Polly implementation (1.11)
-    try:
-        from components.tts.aws_polly_tts import AWSPollyTTSProvider, AWSPollyTTSConfig
-        implementations["aws_polly_tts"] = True
-    except ImportError:
-        implementations["aws_polly_tts"] = False
+        implementations["openai_tts"] = False
     
     # Test factory pattern
     try:
@@ -291,8 +284,7 @@ def test_subtask_1_9_to_1_12_tts_implementations():
     import os
     file_checks = {
         "elevenlabs_tts_file": os.path.exists("src/components/tts/elevenlabs_tts.py"),
-        "azure_tts_file": os.path.exists("src/components/tts/azure_tts.py"),
-        "aws_polly_tts_file": os.path.exists("src/components/tts/aws_polly_tts.py"),
+        "openai_tts_file": os.path.exists("src/components/tts/openai_tts.py"),
         "base_tts_file": os.path.exists("src/components/tts/base_tts.py")
     }
     
@@ -506,8 +498,7 @@ def test_overall_task_1_completion():
         # TTS implementations (1.9-1.12)
         "src/components/tts/base_tts.py",
         "src/components/tts/elevenlabs_tts.py",
-        "src/components/tts/azure_tts.py",
-        "src/components/tts/aws_polly_tts.py",
+        "src/components/tts/openai_tts.py",
         
         # VAD implementations (1.13-1.15)
         "src/components/vad/base_vad.py",

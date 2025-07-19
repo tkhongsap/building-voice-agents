@@ -16,8 +16,7 @@ Based on the PRD analysis of functional requirements, user stories, and technica
 - `src/components/stt/google_stt.py` - Google Cloud Speech STT integration
 - `src/components/llm/anthropic_llm.py` - Anthropic Claude LLM integration
 - `src/components/llm/local_llm.py` - Local model support (Llama, custom endpoints)
-- `src/components/tts/azure_tts.py` - Azure TTS integration with multiple voice options
-- `src/components/tts/aws_polly_tts.py` - AWS Polly TTS implementation with neural voices
+- `src/components/tts/openai_tts.py` - OpenAI TTS implementation for cost-effective fallback
 - `src/components/vad/silero_vad.py` - Silero VAD implementation with high-accuracy detection
 - `src/components/vad/webrtc_vad.py` - WebRTC VAD implementation for lightweight detection
 - `src/components/error_handling.py` - Comprehensive error handling and graceful degradation system
@@ -105,8 +104,7 @@ Based on the PRD analysis of functional requirements, user stories, and technica
   - [x] 1.7 Implement local model support (Llama, custom endpoints)
   - [x] 1.8 Create LLM provider abstraction layer with consistent interface
   - [x] 1.9 Implement ElevenLabs TTS integration with voice cloning support
-  - [x] 1.10 Implement Azure TTS integration with multiple voice options
-  - [x] 1.11 Implement AWS Polly TTS integration
+  - [x] 1.10 Implement OpenAI TTS integration as cost-effective fallback
   - [x] 1.12 Create TTS provider abstraction layer with streaming synthesis
   - [x] 1.13 Implement Silero VAD for voice activity detection
   - [x] 1.14 Implement WebRTC VAD as alternative option
