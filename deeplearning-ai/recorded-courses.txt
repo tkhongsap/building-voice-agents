@@ -1,0 +1,335 @@
+[Speaker 1]
+In this reference, we will dive into the fundamentals of AI voice agents and their key components, such as quiche to text, text to speech and large language models while analyzing the latency to introduce the English layer and The Voice agent stack you. Explore how platforms like, live kit mitigate these latency challenges by providing optimized Network infrastructure and implementing low latency communication protocols. Finally, you walk through a minimal example of building a voice agent in python and.
+
+[Speaker 1]
+Always 18 performance. Let's get started before we dive in. You might be wondering what exactly is a PI race agent simpler, but an AI voice agent brings together speech capabilities and the reasoning our foundation models to enable real-time human-like conversations. Voice agency is who, in a wide range of scenarios in education, they can guide personalized skill development or conduct more interviews in business. They can help handle customer service calls.
+
+[Speaker 1]
+And because voice agent interactions are kind of straight, they could also enhance accessibility. Think of a patient using a voice agent to lock symptoms or practice talk therapy at home. Now, let's break down the anatomy of a voice agent stack. The system takes as input the user's voice, like a user question or request, and produces a voice response. In some cases, that audio output might also be synchronized with video, such as a talking head Avatar, but for this course, we'll focus on audio.
+
+[Speaker 1]
+Two main options. The first is to use a speech to speech for real-time API. This option is simpler to implement, but it offers less flexibility and control over the agent's Behavior. The second and the post will primarily focus on this course. The voice agent pipeline is made up of three components, a speech attacks model or API, an llm, or a genetic framework and a text to speech model for API that generates the final audio output.
+
+[Speaker 2]
+Let's
+
+[Speaker 1]
+Take a more detailed look at each component of the voice agent pipeline. The first component is automatic speech recognition or ASR, also referred to as speech to text or sdt. This involves transcribing a given audio signal.
+
+[Speaker 1]
+Audio, and the output is the corresponding transcription. The second component is the large language model or a broader agentic workflow, which generates a response based on the transcribed text. This layer may involve one for more LLM agents of an enhanced with two use memory, applying abilities. As an aside, a voice agent can also produce transcripts enriched with supporting materials, such as images or links, as a fire product of its functionality. This pipeline can be.
+
+[Speaker 1]
+Of those spoken output and visual context are needed. The third component is text to speech or TTS, also known as speech synthesis. This is the task of converting the generated text back into natural sounding, intelligible speech. The input here is text, and the output is audio in a demo? We will see shortly. The synthesized voice is that of Android. Beyond these three main components, it is important to highlight two additional tasks that are essential for corrective processing human.
+
+[Speaker 1]
+Activity detection ovad, which determines whether human speech is present in the audio signal. For example, a lack of detected speech May correspond to a natural cause or two sections dominated by background noise. The second task is end of turn detection, which identifies when a speaker has completed their term in the conversation. This is a non-trivial challenge. A speech often includes causes ovarying lengths depending on the speaker's language habits and expressive Style.
+
+[Speaker 1]
+Is the next question is? How do we actually build these components? Fortunately, we don't need to store from scratch. Instead, we can focus on the parts of the style that matter most for our specific use case. For instance, depending on the applications, some components may require more attention than others. If you're developing a voice agent for a clinical effect, for example, the ASR component becomes critical. You will need
+
+[Speaker 2]
+To
+
+[Speaker 1]
+Accurately recognize specialized medical vocabulary and meet strict procedure requirements on the other. The llm originate workflow becomes more important as you only robust reasoning and reliable for use to avoid issues like overbooking tables. Unless your his case requires a specialized on-device model. You can choose from a wide range of providers for TTS, STT, and llm apis. On this slide, we've listed some of those options in the gray boxes. And as you can see, many providers are available and worth exploring in the demo. At the end of the lesson, we use openai for sct.
+
+[Speaker 1]
+An 11 Labs custom voice model using a recording of Andrew's voice to create a consistent and personalized AI voice call for speech synthesis. Finally, for the llm component, a flow latency is a key requirement. You may want to explore open source platma models, serve by fast inference providers such as Grog cerebrus or together AI. If you choose to build your voice agent, using the speech to speech or real-time API approach, there are also several providers available to support. Eyes abstract away much of the underlying pipeline and are ideal for use cases where rapid deployment is more important than fine grain control, regardless of which agent architecture you choose. You'll face one major challenge timing. Humans expect responses within a narrow window, and if the system lags. The interactions quickly feel unnatural to maintain a smooth conversational flow. Your infrastructure must support low latency, audio streaming, and efficiently managed.
+
+[Speaker 1]
+Free real-time interactions across multiple users, while ensuring seamless transitions between components like ED stt, the llm, and TTS without introducing noticeable delays at any stage. By considering latency, it is helpful to start with a baseline. How quickly do humans expect a response in natural conversation? User service have shown that, on average, people anticipate a response within 236 milliseconds after the conversation partner.
+
+[Speaker 1]
+Around 520 milliseconds, which reflects the natural variability in human speech. It's also important to note that these numbers are based on English speakers. Other languages can exhibit significantly faster or slower response times. Now, if you look at the table on the slide, we can see the latency introduced by each step in the voice agent pipeline. In the best case scenario with efficient input outputs in handling the lower bound for full voice, agent response is approximately 55.
+
+[Speaker 1]
+Pokemon expectations. However, depending on the service level agreements of the providers you use, the latency can increase over a second and a half, which uses the almost certainly notice. So, how can we approach the lower bounds of latency that align with natural human conversation? The key lies in real time, peer-to-peer communication, which enables direct data exchange between devices, bypassing intermediary servers, and significantly reducing delays. In this setup, your client.
+
+[Speaker 1]
+While your voice agent backhand functions with the other life is, infrastructure is designed to support this with a globally distributed mesh Network for media forwarding at the core of this system are several technologists. First, we have RTC web. Real-time communication is an open source project that provides web and mobile applications where real-time communication capabilities through standardized apis. Second, websocket is used to establish a client server handshape, enabling al.
+
+[Speaker 1]
+Open Source implementation. I relies on asynchronous processing and careful management of input, output streams, and streaming apis, particularly for the sdt, TTS, and llm component. This ensures smooth, low latest performance throughout the voice agent pipeline, while the underlying peer-to-peer infrastructure is complex and something else will walk you through later in the course. Live kit abstracts much of that complexity and makes it remarkably simple to Define an AI voice agent.
+
+[Speaker 1]
+Up a voice agent background. There are three main components to focus on first, defining the Asian itself, including any prompts. Second, the Asian session, which
+
+[Speaker 2]
+Links
+
+[Speaker 1]
+Together your chosen speech to text llm and text to speech providers into a functional pipeline. And third, the entry point function, which is executed as the main function for each new peer-to-peer Communication. You'll dive deeper into the code and configurations later in the course, for now. Know that?
+
+[Speaker 1]
+The code to reference a custom 11 Labs voice clone. We've trained at real Avatar to wrap up this section. I want to highlight a few unique challenges that come with building voice-based applications. Speech displaces, such as pillar work like prolonged causes, can introduce artifacts and conscription in effect end of term detection. These issues then propagate into the intro given to the llm, potentially reducing output quality. Second, if you're working on multilingual voice agents, keep in mind that multilingual ASR models generally underperform compared to English ASL. Now, let's start briefly to latency optimization.
+
+[Speaker 1]
+This is challenging, especially when trying to separate clients sideways from server-side delays to help minimize those delays by Design, likely provides a low latency Network infrastructure in SCT llm TTS pipeline. The ll1 component is often domain source of latency.
+
+[Speaker 2]
+To reduce
+
+[Speaker 1]
+It, you can use smaller or quantized models when self-hosting, or else for faster inference providers. If you're relying on llm apis, you can also count.
+
+[Speaker 1]
+Latency response time. Now, let's see this in action. I'm going to show you a brief demonstration of the voice agency used in our Android Avatar, The Voice Age on backhand, is running locally on my laptop. For the front end, we'll use the license playground, which is a versatile web front end that makes it easy to test the multimodal AR agent without having to worry about the UI until you're happy with your backhand here. On the left hand side, you can see the voice agent code, which is very similar to the.
+
+[Speaker 1]
+Find agents later in the course in the back and on the right hand side. You see the code running locally on my computer in the command line. Here's the left hit playground running on my browser. I've created a project for the course, like kit course.
+
+[Speaker 3]
+And now I'm going to connect. Hi,
+
+[Speaker 4]
+How are you? Do you want to learn more about machine learning?
+
+[Speaker 1]
+Tell me about AI voice agents?
+
+[Speaker 4]
+Ai voice agents are systems that use natural language processing and machine learning to understand and respond to human speech, providing information or performing tasks. Are you interested in building one or learning how they work in more detail?
+
+[Speaker 1]
+Wow, I think it turned out really well. It sounds a lot like, Andrew, don't you think? Okay, let's try voice activity detection. If this works, we should be able to interrupt and the Avatar should stop speaking. Tell me about speech to text novels.
+
+[Speaker 4]
+Speech to text models, convert spoken language into written texts, using techniques like deep learning, often leveraging architectures like recurrent neural networks or transport
+
+[Speaker 1]
+Speech.
+
+[Speaker 4]
+Text to speech, tedious models, transform written text into spoken words, using machine learning algorithm to produce natural sounds. Are you curious about how these models can be applied in real world applications?
+
+[Speaker 1]
+Okay, the voice activity detection allowed us to interrupt. This is great. Let's go on to the next lesson, where you'll learn more about the details of the end-to-end architecture of a voice agent.
+
+[Speaker 2]
+Then,
+
+[Speaker 4]
+We discussed how we'll connect our client device to the voice agent via webrtc. That's great. Your user can now speak to your agent with less than 30 to 50 milliseconds of latency. But what is a voice agent. Anyway, a voice agent is simply a staple computer program that can consume and process waste data streaming into it, like from a user speaking into their phone, and it can generate a spoken response to send back to that user. Most of the application logic of your agent program will be specific to your use case, but voice agents built museum.
+
+[Speaker 4]
+Linking it to one or more client devices. Live gets agents SDK also takes care of things, like managing the conversation context and spinning up an instance of your agent for every user that wants to speak to it. Every agent instance may keep a database connection for performing actions like rag, interact with libraries or Services running on the same machine, or make HTTP requests or establish websocket connections to external services for things like spe.
+
+[Speaker 4]
+You'll use, like its infant SDK, for building your voice agent. You'll build your agent in Python, but you can also use node.js as well. How do we give the agent the ability to listen, think, and speak back to the user? Let's zoom in on that part. This is what's known as a pipeline or cascaded or component model voice architecture as voice input data from a user streams into the agent. It passes through an ordered.
+
+[Speaker 4]
+Agent is sent back to the user. First, the agent relays the user's face to a smaller speech detect AI model, often abbreviated stt. The stt model converts the speech to text in real time and passes it back to the agent. Once the user is done speaking, and the agent has the full transcription of what the user said it. Relays that full transcription to an llm as the user's prompt the llm takes. Instead, as output tokens are generated, they stream back out to the agent from the llm. The agent collects and organizes these tokens for every sentence that it collects, the agent will relay that sentence to another smaller, text-to-speech model,
+
+[Speaker 2]
+Often
+
+[Speaker 4]
+Abbreviated TTS. The TTS model will convert those sentences sent by the agent back into speech and stream them to the agent. The agent takes those and will relay the bytes by.
+
+[Speaker 4]
+Advice over the persistent webrtc connection we talked about in the previous lesson, and so that's the full end-to-end pipeline that your agent is running through where it takes user speech, converts it into text, puts that text through an llm, takes the tokens coming out of the llm pipe set through TTS and then from TTS streams, the audio back to the user. I want to turn our attention now, though, to one of the hardest problems in building convincing.
+
+[Speaker 4]
+Him in a human conversation. This concept of alternating between speaking and listening is known as turn. Taking a human is quite good at sort of automatically knowing the patient speak or listen. Turn detection is a heuristic of voice agent uses to know when the user is done speaking, and it can respond. Contemporary turn detection systems combine two signals. The first is signal processing is, is.
+
+[Speaker 4]
+Is semantic processing? What did the user actually say? Here's how this is done, typically as user audio streams into the agent. It's not just sent to sdt, but in parallel, it's also streamed into something called voice activity detection or vad for short. Vad analyzes the audio signal. It's a small binary classifier neural network that simply outputs whether human speech was.
+
+[Speaker 4]
+From human speech detected to not detect it, vad starts a timer for a developer configurable number of milliseconds before firing an event marking the end of the user's turn. If bad detects human speech again before the timer has fired, everything is reset as the user's speech is converted into text by stt and sent back to the agent. The agent also forwards the transcriptions from stt to another part.
+
+[Speaker 4]
+Model live kit has an open source Transformer model that we've trained in-house. It takes in a user's transcribed speech and the transcriptions from the last three or four previous terms in the conversation and outputs a prediction. Whether it thinks the user is done speaking or not, based on what they've said if vad detected silence and set a timer to fire the end of turn event. But the semantic model believes the user isn't done speaking yet, for example. Is pausing between thoughts. The turn detector will delay the timer from firing for a configurable amount of time, and now that we have an understanding of turn detection. This is what our overall Voice agent architecture looks like with it Incorporated only when the turn detection system has fired an end of turn event. Can the agent proceed to forwarding the user's transcribed speech to the llm for inference? Vad isn't just used for current detection either.
+
+[Speaker 4]
+To mimic the Dynamics of two humans having a conversation. We need to be able to handle the case when a user interrupts the voice agent's mid speech. This could happen for a variety of reasons, including the llm may be speaking more than necessary, or the user change their mind about something the user may want to correct themselves in them
+
+[Speaker 2]
+Under
+
+[Speaker 4]
+The hood. Since the user's speech is already being passed into VAD via turn detection, we're using the.
+
+[Speaker 4]
+Section to signal an interruption when an interruption occurs. Every part of the voice pipeline Downstream is flush if the llm was performing inference at that time that stopped if there was any agent speech being generated by TTS. That's also stopped one final update to our overall architecture here is context management when it's the agent's turn to think and speak. Not only is the most recent transcription of what the user.
+
+[Speaker 4]
+Everything that's been said thus far by either party during that session is also sent along. This includes things like function calls and their results, which is part of most production grade voice agents. Live hits agents SDK also automatically synchronizes the llm context when the user interrupts the agent. It uses timestamps to determine the last thing the user heard played back from the agent and aligns the conversation on the agent side.
+
+[Speaker 4]
+In the next lesson, we're going to take all of these Concepts. In theory, we've discussed here, and we're going to put them into practice by building a voice agent that usually speak to.
+
+[Speaker 4]
+In this lesson, we're going to walk through the different building blocks of a voice agent. From the moment someone starts speaking all the way to when the agent responds. We'll break down each stage in the pipeline, talk about trade-offs, and look out where you can make decisions that really shape the user experience. Whether you're optimizing for Speed quality or control, understanding how each layer works will help you build smarter, more effective voice agents. There are two main types of voice agents. First, there's the pipeline approach, which Russ walk through in detail earlier and?
+
+[Speaker 4]
+Introduced back in the first lesson. Speech to speech agents are usually simpler to implement, and they can sound really natural. But in exchange, you give up control since the model takes in speech and output speech. It's harder to see or tweak what's happening in the middle pipeline agents, on the other hand, have more moving parts and gas more complexity, but you get fine-grained control over each stage. You can see and manage exactly what's coming in and going out at each step, which can be a big deal for Real World applications.
+
+[Speaker 4]
+Probably have to choose between latency, quality and cost. One of the big advantages of using a pipeline approach is that you don't have to make that trade-off globally. You can change out different parts of your system based on what matters most for your use case. In the example that Alina gave earlier, if you're doing something like restaurant bookings, you might want to optimize for llm reasoning, getting the best possible response from the model, but if you're handling something like medical triage where accurate transcription is critical, then it might make more sense to spend some more of your L.
+
+[Speaker 4]
+Matters when the rubber meets the rope.
+
+[Speaker 2]
+Some of the key things
+
+[Speaker 4]
+To keep in mind as you're designing each of these sections, starting with voice activity detection, this component only sends audio when it detects someone is actually speaking. That's a big deal. It reduces hallucinations from your speech to text model, and it cuts down on costs. Since you're not sending silence for transcription when there's no voice to transcribe. Then we've got the speech to Tyson. This is where we need to make some key decisions. Like, if you want to support whether we're doing direct?
+
+[Speaker 4]
+Voice, and there were use cases like telephony, the final two steps in your voice agent are the llm layer and text distinction. Now, the llm layer is the one that people are already most familiar with. This is where we run text-to-text inference to get a response from a large language model. If you want to add things like content filtering, this is the layer where you do it. It's where you'll see the biggest latency hits depending on which model you're using. And finally, you have text to speech or CTS. This layer takes the text from the llm and turns.
+
+[Speaker 4]
+Accent views and whether you want to apply in pronunciation and overrides or specific words or phrases that you've once spoken in a certain way. Now, let's put everything you learned into action and get coding. First, we'll import the necessary Livekit agent classes and plugins, including openai for speech to text, and as the inference layer 11 labs for TTS and solero for voice activity detection, while also import dot in so we can get our environment variables into memory and loggings that we can see. What's going on with our agents?
+
+[Speaker 4]
+Class. This assistant is given basic instructions about its role and will keep track of what's being said so far in the conversation by default requests that are sent to an llm for a response or state list, but we want to maintain a conversation with history. The
+
+[Speaker 2]
+Assistant
+
+[Speaker 4]
+Will keep all of the messages that we've sent back and forth in context so that it can hold a conversation that's aware before
+
+[Speaker 2]
+You've already seen.
+
+[Speaker 4]
+It also keeps track of whose turn it is to talk if it can be interrupted, and which, if any, tools that it has added to disposal to answer questions for each?
+
+[Speaker 4]
+Other defaults from the base. Next, we'll Define an asynchronous entry point function, which will run when live kit tells our agent that it's unique. By default, every new room will request an agent. Rooms are the Primitive. They connect Asian sessions to Industries when an agent and a user are having a conversation that's happening inside a room step by step. This entry point function connects to a live kit room. We Define a agent session with all necessary plugins to unload to listen and speak to the user, and we assign our assist.
+
+[Speaker 4]
+Y command. To register the application with like, this will allow our agent to be dispatched rules when we run this
+
+[Speaker 2]
+Next
+
+[Speaker 4]
+Cell. We'll be able to have a conversation with our agents.
+
+[Speaker 5]
+Hello there! It's wonderful to have you here. How can I assist you today?
+
+[Speaker 4]
+Hi there, what kind of things can you help with?
+
+[Speaker 5]
+Hi, I'm here to help with a wide range of topics. Whether you need information, help solving a problem, or just going to chat? Feel free to ask about anything
+
+[Speaker 4]
+Great this. We're agent lives. Now that our agent is running, let's change the voice out for something else.
+
+[Speaker 4]
+We're going to scroll back up here to where we Define our custom agent. And we're going to add a voiceover.
+
+[Speaker 2]
+Now when we run
+
+[Speaker 4]
+Agent? There, and it's wonderful to have you here. How can I assist you today? Hi, Roger. Thanks for
+
+[Speaker 1]
+Joining us. I
+
+[Speaker 4]
+Love your voice. Thank you so much! It's great to be here with you. How can I make your day better? So, to recap from this lesson, we were able to get our agent running and we were able to change some of the settings that we could have a different voice. In the next lesson, we'll learn a little bit about metrics and how we can optimize our agents.
+
+[Speaker 2]
+Voice
+
+[Speaker 4]
+Agents live or die by ladies. In this lesson, we'll walk through each stage of the voice pipeline and look at where delays happen and how to reduce them from speech detection to text generation and back to voice will cover the key levers that you can pull to make your agent feel fast and responsive. A critical part of keeping things fast comes from the client. Let's talk a bit more about webrtc. Webrtc is an open source project that enables real-time communication directly in web browsers and mobile apps. The key thing here here?
+
+[Speaker 2]
+Into the software. It uses
+
+[Speaker 4]
+The get user media API to access your device's camera and microphone and also support screen sharing through the get displayed media methods, and if you want to go beyond just audio and video, you can use RTC data channels for direct data exchange. All right, let's talk about optimizing this speech pipeline. You probably remember the main components here. We've got voice activity detection, which identifies when someone is speaking term detection, which helps manage speaker transitions and speech to text, which converts audio into.
+
+[Speaker 4]
+We don't want to send audio frames unless we're confident it's actually voice with that. We usually lose about 15 to 20 milliseconds at the start of each utterance just to confirm that speech is happening. Turn detection is a bit different. It's not blocking for a transcription. It listens for the end of a user's turn and fires an event. When that turn is done, but it doesn't stop transcription from happening while someone is still speaking. So here's how it works in practice. If someone is speaking a paragraph, say five sentences speech to text transcribes continuously.
+
+[Speaker 4]
+Segments go off to the transcriber in real time, then once turn detection signals that the speaker is done. That's when we send the full transcript to the outline, so it's not all waiting on one big block. It's a stream, and turn detection just helps us know when to move forward. Next up is the llm stage. Llms generate responses token by token and even the model itself doesn't know exactly how long the full response will be until it's finished, so it wouldn't make sense for us to wait until the whole response is ready. Instead, we screen the output from the lll.
+
+[Speaker 4]
+Track here is time to First. That's how long it takes for the model to produce the very first part of its response. It usually defines how long users are waiting before anything starts happen. Everything after that happens to be synchronously as the llm keeps generating tokens. We're already passing that text off to the TTS engine to start synthesizing speech. So, if you want to cut down
+
+[Speaker 2]
+Your
+
+[Speaker 4]
+Overall response time time to First token is where you want to focus your latency optimizations. Finally, we
+
+[Speaker 2]
+Have
+
+[Speaker 4]
+Text-to-speech streaming. In this stage, we're streaming directly from the.
+
+[Speaker 4]
+Time to First token is the key metric. Here are the most important thing to watch is time to first fight. That's when we actually start hearing audio come out of the TTS engine, the total time it takes to render the full response is less critical. As long as rendering happens faster than the engine can speak it, since it takes time to physically speak the utterance. The model has a buffer. So, again, for TTS performance, the thing to optimize is that time to First fight. That's what determines how quickly the voice actually starts responding.
+
+[Speaker 2]
+Let's see how
+
+[Speaker 4]
+Fast our agent really is and track.
+
+[Speaker 4]
+I'm gonna import our agent plugins and modules. We are going to have to add a few extras, though. We're going to import the metric classes that Define the structure of the data collected from each part of the voice pipeline. These classes help us access performance information like response time, token counts, audio durations, things like that. We're also going to import async iOS. We can run asynchronous tasks. This lets us handle metrics, collection, and other background work without blocking the main flow of your agent. Next, we're going to Define our agent.
+
+[Speaker 4]
+Next, we're going to add our metrics collection box. These handlers. Let us collect performance data from each part of the pipeline and Trigger callback functions and metrics are available. The first thing that we're adding is our llm metrics, so that's for time to First token and tokens per second. Next, we're going to add our stt metrics wrapper. Is going to tell us the duration of input and whether streaming is used. Next, we'll add our end of utterance metrics, wrapper, and this one here is going to tell us how long it took us to detect that someone was speaking with Vad and also how long transcription took.
+
+[Speaker 4]
+Lastly, our text-to-speech metric forever. This one is going to be time to First fight total render time. This is the one that says how fast the agent is starting to speed backwards. Now that we have our wrappers defined, we are going to actually Define the callback functions that are going to collect the metrics and print them to the console. First, our llm metrics. Things that we're tracking. Here are the prompt tokens, completion tokens, tokens per second, and that time to First token. That's so critical. Next, we'll add our speech to text metrics, so the total duration of audio and whether or not the response is treatment. Next
+
+[Speaker 2]
+Is
+
+[Speaker 4]
+Our end of utterance metrics? This is the one that tells us how long the speech to text took to run, and how long that lastly
+
+[Speaker 5]
+Is
+
+[Speaker 4]
+Our text-to-speech metrics? This is the time to First byte, so how long it takes until we can? Audio duration and whether or not the response is still. Define our entry point, just like we did in the last agent.
+
+[Speaker 2]
+Then we can run our.
+
+[Speaker 2]
+Hi, I wanted to see how fast you were.
+
+[Speaker 5]
+Hello, I'm designed to respond quickly to your questions and requests. How can I assist you today?
+
+[Speaker 4]
+Now, as we scroll down through our login, we can see all of our speech to text metrics. We can see our llm metrics, including tokens per second and time to First token, and then we can see how long it took for those critical first bytes to come through. Okay, so let's make a change right now. Our time to First token through our llm was 0.84 seconds, but I think we can make that a little bit better. We're going to change
+
+[Speaker 5]
+Our
+
+[Speaker 4]
+Llm model from gbt40 to gpt40 mini. This is a slightly less capable b.
+
+[Speaker 4]
+Let's try talking to our agent again using 409.
+
+[Speaker 2]
+Hi there! I just wanted to see how fast you are.
+
+[Speaker 5]
+I'm ready to help. What do you need assistance with?
+
+[Speaker 4]
+Now, if we scroll down to look at our llm metrics, we can see our time to First. Token was almost twice as fast as what we used 4L. So, just to recap in this lesson, we rebuilt. Our agent added all the ability for us to track metrics. Reduce the response time of our llm by almost half.
+
+[Speaker 4]
+Generations.
