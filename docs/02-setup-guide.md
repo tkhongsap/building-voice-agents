@@ -1,5 +1,10 @@
 # Voice Agent Setup Guide
 
+**📖 Learning Path Navigation:**
+[← 01 Quick Start](01-quick-start-guide.md) | **02 Setup Guide** | [03 Architecture →](03-voice-agent-architecture.md)
+
+**📚 All Guides:** [Complete Guide](00-complete-voice-agent-guide.md) | [01 Quick Start](01-quick-start-guide.md) | [02 Setup](02-setup-guide.md) | [03 Architecture](03-voice-agent-architecture.md) | [04 Components](04-core-components-guide.md) | [05 Implementation](05-implementation-tutorial.md) | [06 Turn Detection](06-turn-detection-guide.md) | [07 Performance](07-performance-optimization.md) | [08 Applications](08-applications-guide.md) | [09 LiveKit Reference](09-livekit-reference.md)
+
 ## Prerequisites
 
 Before starting, you need to obtain API keys from the following services:
