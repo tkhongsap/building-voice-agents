@@ -1,0 +1,45 @@
+# Test Dependencies for Task 1.0 Voice Processing Pipeline
+# This file contains all dependencies needed to run the complete test suite
+
+# Core LiveKit and voice agent dependencies
+livekit-agents[openai,silero,elevenlabs]==1.0.11
+
+# HTTP client for API requests
+httpx==0.28.1
+
+# Testing framework
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-mock==3.12.0
+
+# OpenAI dependencies
+openai>=1.0.0
+
+# Anthropic Claude dependencies  
+anthropic>=0.8.0
+
+# Audio processing dependencies
+numpy>=1.24.0
+torch>=2.0.0
+onnxruntime>=1.16.0
+webrtcvad>=2.0.10
+
+# Performance monitoring
+psutil>=5.9.0
+
+# Additional utilities
+websockets==12.0
+python-dotenv==1.0.1
+aiofiles>=23.0.0
+
+# Development utilities
+ipython>=8.13.0
+
+# Optional dependencies for comprehensive testing
+scipy>=1.10.0  # Audio signal processing
+soundfile>=0.12.0  # Audio file I/O
+librosa>=0.10.0  # Audio analysis (optional)
+
+# Linting and formatting (optional)
+ruff>=0.1.0
+black>=23.0.0

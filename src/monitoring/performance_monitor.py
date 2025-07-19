@@ -8,7 +8,6 @@ and analysis for all voice processing pipeline components.
 import asyncio
 import logging
 import time
-import psutil
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,6 +16,14 @@ from collections import defaultdict, deque
 import statistics
 import json
 from contextlib import asynccontextmanager
+
+# Optional dependency for system metrics
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
 
 logger = logging.getLogger(__name__)
 
@@ -506,12 +513,29 @@ class SystemResourceMonitor:
     """Monitor system resource usage."""
     
     def __init__(self):
-        self.process = psutil.Process()
+        if PSUTIL_AVAILABLE:
+            self.process = psutil.Process()
+        else:
+            self.process = None
         self.last_cpu_time = None
         self.last_measurement_time = None
     
     def get_metrics(self) -> Dict[str, float]:
         """Get current system resource metrics."""
+        if not PSUTIL_AVAILABLE:
+            # Return mock metrics when psutil is not available
+            return {
+                "cpu_usage_percent": 0.0,
+                "process_cpu_percent": 0.0,
+                "memory_usage_percent": 0.0,
+                "memory_available_gb": 0.0,
+                "process_memory_mb": 0.0,
+                "disk_read_mb": 0.0,
+                "disk_write_mb": 0.0,
+                "network_sent_mb": 0.0,
+                "network_recv_mb": 0.0
+            }
+        
         try:
             # CPU usage
             cpu_percent = psutil.cpu_percent(interval=None)
