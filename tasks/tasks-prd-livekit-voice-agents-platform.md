@@ -100,7 +100,7 @@ Based on the PRD analysis of functional requirements, user stories, and technica
   - [x] 1.2 Implement Azure Speech STT integration with real-time transcription
   - [x] 1.3 Implement Google Cloud Speech STT integration
   - [x] 1.4 Create STT provider abstraction layer with unified API
-  - [x] 1.5 Implement OpenAI GPT-4o LLM integration with function calling
+  - [x] 1.5 Implement OpenAI GPT-4.1-mini LLM integration with function calling
   - [x] 1.6 Implement Anthropic Claude LLM integration
   - [x] 1.7 Implement local model support (Llama, custom endpoints)
   - [x] 1.8 Create LLM provider abstraction layer with consistent interface

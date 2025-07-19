@@ -72,7 +72,8 @@ class OpenAILLMProvider(BaseLLMProvider):
             LLMModelType.GPT_4,
             LLMModelType.GPT_4_TURBO,
             LLMModelType.GPT_4O,
-            LLMModelType.GPT_4O_MINI
+            LLMModelType.GPT_4O_MINI,
+            LLMModelType.GPT_4_1_MINI  # Latest model - better performance and cost
         ]
     
     @property

@@ -31,6 +31,7 @@ class LLMModelType(Enum):
     GPT_4_TURBO = "gpt-4-turbo"
     GPT_4O = "gpt-4o"
     GPT_4O_MINI = "gpt-4o-mini"
+    GPT_4_1_MINI = "gpt-4.1-mini"  # Latest GPT-4.1 mini model - better and cheaper
     CLAUDE_3_HAIKU = "claude-3-haiku"
     CLAUDE_3_SONNET = "claude-3-sonnet"
     CLAUDE_3_OPUS = "claude-3-opus"
@@ -99,7 +100,7 @@ class LLMConfig:
     
     def __init__(
         self,
-        model: LLMModelType = LLMModelType.GPT_4O_MINI,
+        model: LLMModelType = LLMModelType.GPT_4_1_MINI,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         top_p: float = 1.0,

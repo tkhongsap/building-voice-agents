@@ -121,12 +121,12 @@ def test_llm_config_creation():
     from components.llm.base_llm import LLMConfig, LLMModelType
     
     config = LLMConfig(
-        model=LLMModelType.GPT_4O_MINI,
+        model=LLMModelType.GPT_4_1_MINI,
         temperature=0.7,
         max_tokens=1000
     )
     
-    assert config.model == LLMModelType.GPT_4O_MINI
+    assert config.model == LLMModelType.GPT_4_1_MINI
     assert config.temperature == 0.7
     assert config.max_tokens == 1000
 
@@ -291,7 +291,7 @@ def test_openai_llm_import():
     from components.llm.openai_llm import OpenAILLMProvider, OpenAILLMConfig
     from components.llm.base_llm import LLMModelType
     
-    config = OpenAILLMConfig(api_key="test_key", model=LLMModelType.GPT_4O_MINI)
+    config = OpenAILLMConfig(api_key="test_key", model=LLMModelType.GPT_4_1_MINI)
     provider = OpenAILLMProvider(config)
     
     assert provider.provider_name == "openai_gpt"
