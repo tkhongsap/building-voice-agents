@@ -154,11 +154,11 @@ Based on the PRD analysis of functional requirements, user stories, and technica
   - [x] 4.1 Create comprehensive Python SDK with intuitive API design
   - [x] 4.2 Implement 10-minute quickstart guide with working examples
   - [x] 4.3 Create pre-built recipes for telehealth use cases
-  - [ ] 4.4 Create pre-built recipes for call center applications
-  - [ ] 4.5 Create pre-built recipes for real-time translation
-  - [ ] 4.6 Develop comprehensive integration guides for all AI providers
-  - [ ] 4.7 Create local development tools with hot reloading
-  - [ ] 4.8 Implement CLI tools for agent management and deployment
+  - [x] 4.4 Create pre-built recipes for call center applications
+  - [x] 4.5 Create pre-built recipes for real-time translation
+  - [x] 4.6 Develop comprehensive integration guides for all AI providers
+  - [x] 4.7 Create local development tools with hot reloading
+  - [x] 4.8 Implement CLI tools for agent management and deployment
   - [ ] 4.9 Add debugging tools and conversation inspection capabilities
   - [ ] 4.10 Create interactive code playground and testing environment
   - [ ] 4.11 Implement comprehensive API documentation with examples
