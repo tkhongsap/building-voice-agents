@@ -15,6 +15,11 @@ from typing import Dict, Any, List, Optional
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
 
+# Import communication test fixtures
+pytest_plugins = [
+    "tests.unit.test_communication.conftest_communication"
+]
+
 
 # ============================================================================
 # TEST DATA FIXTURES
