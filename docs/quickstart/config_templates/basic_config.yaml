@@ -1,0 +1,56 @@
+# Basic Voice Agent Configuration
+# Copy this file and customize for your needs
+
+# Project settings
+project_name: "my-voice-agent"
+environment: "development"  # development, staging, production, test
+log_level: "INFO"           # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# Component settings
+enable_auto_discovery: true
+component_timeout: 30.0
+
+# Audio pipeline configuration
+pipeline:
+  sample_rate: 16000        # Audio sample rate (8000-48000)
+  chunk_size: 1024          # Audio chunk size (128-4096)
+  buffer_size: 4096         # Audio buffer size
+  enable_vad: true          # Voice activity detection
+  enable_echo_cancellation: true
+  enable_noise_suppression: true
+  enable_auto_gain_control: true
+  latency_mode: "low"       # low, balanced, quality
+
+# OpenAI Configuration
+openai:
+  # api_key: "sk-..."       # Set via OPENAI_API_KEY env var
+  api_url: "https://api.openai.com/v1"
+  model: "gpt-3.5-turbo"
+  temperature: 0.7
+  max_tokens: 150
+  timeout: 30.0
+  max_retries: 3
+  retry_delay: 1.0
+
+# ElevenLabs Configuration  
+elevenlabs:
+  # api_key: "..."          # Set via ELEVENLABS_API_KEY env var
+  voice_id: "21m00Tcm4TlvDq8ikWAM"  # Default voice
+  model_id: "eleven_monolingual_v1"
+  optimize_streaming_latency: 2
+  timeout: 30.0
+
+# Development server (for web deployment)
+server:
+  host: "localhost"
+  port: 8080
+  enable_hot_reload: true
+  enable_cors: true
+  cors_origins: ["*"]
+  # ssl_cert: "/path/to/cert.pem"
+  # ssl_key: "/path/to/key.pem"
+
+# File paths (created automatically)
+# config_dir: "~/.voice-agent"
+# cache_dir: "~/.voice-agent/cache"  
+# log_dir: "~/.voice-agent/logs"

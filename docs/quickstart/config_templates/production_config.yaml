@@ -1,0 +1,58 @@
+# Production Voice Agent Configuration
+# Optimized for production deployment with reliability and performance
+
+# Project settings
+project_name: "production-voice-agent"
+environment: "production"
+log_level: "WARNING"        # Reduced logging for production
+
+# Component settings  
+enable_auto_discovery: true
+component_timeout: 60.0     # Longer timeout for production
+
+# Optimized pipeline for production
+pipeline:
+  sample_rate: 16000
+  chunk_size: 1024
+  buffer_size: 8192          # Larger buffer for stability
+  enable_vad: true
+  enable_echo_cancellation: true
+  enable_noise_suppression: true
+  enable_auto_gain_control: true
+  latency_mode: "balanced"   # Balanced mode for production
+
+# Production OpenAI settings
+openai:
+  model: "gpt-4"            # More capable model
+  temperature: 0.3          # Lower temperature for consistency
+  max_tokens: 100           # Shorter responses for speed
+  timeout: 45.0             # Longer timeout
+  max_retries: 5            # More retries
+  retry_delay: 2.0          # Longer delay between retries
+
+# Production ElevenLabs settings
+elevenlabs:
+  voice_id: "21m00Tcm4TlvDq8ikWAM"
+  model_id: "eleven_turbo_v2"       # Faster model for production
+  optimize_streaming_latency: 4     # Highest optimization
+  timeout: 45.0
+  max_retries: 3
+  retry_delay: 1.5
+
+# Production server configuration
+server:
+  host: "0.0.0.0"          # Listen on all interfaces
+  port: 8080
+  enable_hot_reload: false  # Disabled for production
+  enable_cors: true
+  cors_origins: [           # Specific origins for security
+    "https://yourapp.com",
+    "https://www.yourapp.com"
+  ]
+  # ssl_cert: "/etc/ssl/certs/voice-agent.crt"
+  # ssl_key: "/etc/ssl/private/voice-agent.key"
+
+# Production paths
+config_dir: "/var/lib/voice-agent/config"
+cache_dir: "/var/lib/voice-agent/cache"
+log_dir: "/var/log/voice-agent"
