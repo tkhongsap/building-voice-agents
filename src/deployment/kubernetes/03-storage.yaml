@@ -1,0 +1,349 @@
+# Storage configurations for LiveKit Voice Agents Platform
+# Provides persistent storage for databases, logs, and application data
+
+---
+# Storage Class for SSD storage (high performance)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: voice-agents-ssd
+  labels:
+    app: voice-agents-platform
+    component: storage
+provisioner: kubernetes.io/aws-ebs  # Change based on your cloud provider
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+
+---
+# Storage Class for standard storage (cost-effective)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: voice-agents-standard
+  labels:
+    app: voice-agents-platform
+    component: storage
+provisioner: kubernetes.io/aws-ebs  # Change based on your cloud provider
+parameters:
+  type: gp2
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+
+---
+# PostgreSQL PersistentVolumeClaim - Development
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data-pvc
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    environment: development
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-standard
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# PostgreSQL PersistentVolumeClaim - Staging
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data-pvc
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    environment: staging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# PostgreSQL PersistentVolumeClaim - Production
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data-pvc
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    environment: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 200Gi
+
+---
+# Redis PersistentVolumeClaim - Development
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data-pvc
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: redis
+    environment: development
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-standard
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Redis PersistentVolumeClaim - Staging
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data-pvc
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: redis
+    environment: staging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Redis PersistentVolumeClaim - Production
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data-pvc
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: redis
+    environment: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Voice Agent Logs PersistentVolumeClaim - Development
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: voice-agent-logs-pvc
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: logs
+    environment: development
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: voice-agents-standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Voice Agent Logs PersistentVolumeClaim - Staging
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: voice-agent-logs-pvc
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: logs
+    environment: staging
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: voice-agents-standard
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# Voice Agent Logs PersistentVolumeClaim - Production
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: voice-agent-logs-pvc
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: logs
+    environment: production
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: voice-agents-standard
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# Voice Agent Cache PersistentVolumeClaim - Development
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: voice-agent-cache-pvc
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: cache
+    environment: development
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Voice Agent Cache PersistentVolumeClaim - Staging
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: voice-agent-cache-pvc
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: cache
+    environment: staging
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Voice Agent Cache PersistentVolumeClaim - Production
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: voice-agent-cache-pvc
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: cache
+    environment: production
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Prometheus Data PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data-pvc
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: prometheus
+    environment: shared
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# Grafana Data PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data-pvc
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: grafana
+    environment: shared
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Jaeger Data PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jaeger-data-pvc
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: jaeger
+    environment: shared
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Shared Temporary Storage for Processing
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: temp-processing-pvc
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: processing
+    type: temporary
+    environment: production
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: voice-agents-ssd
+  resources:
+    requests:
+      storage: 100Gi

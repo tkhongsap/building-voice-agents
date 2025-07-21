@@ -1,0 +1,158 @@
+# Prometheus Configuration for Voice Agents Platform Monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'voice-agents-dev'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alert_rules.yml"
+
+# Scrape configuration
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Voice Agent main service
+  - job_name: 'voice-agent-main'
+    static_configs:
+      - targets: ['voice-agent:8080']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    labels:
+      service: 'voice-agent'
+      instance_type: 'main'
+
+  # Voice Agent workers
+  - job_name: 'voice-agent-workers'
+    static_configs:
+      - targets: 
+          - 'voice-agent-worker-1:8080'
+          - 'voice-agent-worker-2:8080'
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    labels:
+      service: 'voice-agent'
+      instance_type: 'worker'
+
+  # LiveKit Server metrics
+  - job_name: 'livekit'
+    static_configs:
+      - targets: ['livekit:7880']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    labels:
+      service: 'livekit'
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    labels:
+      service: 'redis'
+
+  # PostgreSQL metrics (if postgres_exporter is added)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    labels:
+      service: 'postgres'
+
+  # NGINX metrics (if nginx_exporter is added)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    labels:
+      service: 'nginx'
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    labels:
+      service: 'cadvisor'
+
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    labels:
+      service: 'node-exporter'
+
+# Recording rules for common queries
+recording_rules:
+  - name: voice_agent_recording_rules
+    interval: 30s
+    rules:
+      # Request rate
+      - record: voice_agent:request_rate
+        expr: rate(http_requests_total[5m])
+      
+      # Error rate
+      - record: voice_agent:error_rate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])
+      
+      # Response time percentiles
+      - record: voice_agent:response_time_p50
+        expr: histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))
+      
+      - record: voice_agent:response_time_p95
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+      
+      - record: voice_agent:response_time_p99
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+      
+      # Worker orchestration metrics
+      - record: voice_agent:active_workers
+        expr: worker_orchestrator_active_workers
+      
+      - record: voice_agent:queued_jobs
+        expr: worker_orchestrator_queued_jobs
+      
+      # Auto-scaling metrics
+      - record: voice_agent:cpu_utilization_avg
+        expr: avg(worker_cpu_utilization) by (service)
+      
+      - record: voice_agent:memory_utilization_avg
+        expr: avg(worker_memory_utilization) by (service)
+
+# Remote write configuration for long-term storage
+remote_write: []
+
+# Remote read configuration
+remote_read: []
+
+# Storage configuration
+storage:
+  tsdb:
+    # Retention period
+    retention: "15d"
+    # Retention size
+    retention_size: "10GB"
+    # Compression
+    wal_compression: true

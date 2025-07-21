@@ -1,0 +1,219 @@
+# LiveKit Specific Alerting Rules
+# Production-ready alerts for LiveKit server monitoring
+
+groups:
+  - name: livekit_critical_alerts
+    interval: 30s
+    rules:
+      # Critical: LiveKit Server Down
+      - alert: LiveKitServerDown
+        expr: up{job="livekit-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: livekit
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/livekit-down"
+        annotations:
+          summary: "LiveKit server is down"
+          description: "LiveKit server on {{ $labels.instance }} has been down for more than 1 minute"
+          impact: "No new WebRTC connections possible, existing connections may drop"
+
+      # Critical: WebRTC Connection Failures
+      - alert: LiveKitHighWebRTCFailureRate
+        expr: |
+          rate(livekit_webrtc_connection_failed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: livekit-webrtc
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/webrtc-failures"
+        annotations:
+          summary: "High WebRTC connection failure rate"
+          description: "WebRTC connection failure rate is {{ $value }} failures/sec"
+          impact: "Users cannot establish voice connections"
+
+      # Critical: Room Creation Failures
+      - alert: LiveKitRoomCreationFailures
+        expr: |
+          rate(livekit_room_creation_failed_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: livekit-rooms
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/room-creation"
+        annotations:
+          summary: "High room creation failure rate"
+          description: "Room creation failure rate is {{ $value }} failures/sec"
+          impact: "Voice sessions cannot be initiated"
+
+      # Critical: High Memory Usage
+      - alert: LiveKitHighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{container="livekit"} / 
+            container_spec_memory_limit_bytes{container="livekit"}
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: critical
+          component: livekit
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/livekit-memory"
+        annotations:
+          summary: "LiveKit memory usage is critically high"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          impact: "Risk of OOM kill and service disruption"
+
+  - name: livekit_warning_alerts
+    interval: 60s
+    rules:
+      # Warning: High CPU Usage
+      - alert: LiveKitHighCPUUsage
+        expr: |
+          rate(container_cpu_usage_seconds_total{container="livekit"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: livekit
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/livekit-cpu"
+        annotations:
+          summary: "LiveKit CPU usage is high"
+          description: "CPU usage is {{ $value }}%"
+          impact: "Performance degradation possible"
+
+      # Warning: High Number of Active Rooms
+      - alert: LiveKitHighActiveRooms
+        expr: livekit_rooms_active > 200
+        for: 10m
+        labels:
+          severity: warning
+          component: livekit-rooms
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-rooms"
+        annotations:
+          summary: "High number of active LiveKit rooms"
+          description: "{{ $value }} rooms are currently active"
+          impact: "Monitor resource usage and consider scaling"
+
+      # Warning: High Participant Count
+      - alert: LiveKitHighParticipantCount
+        expr: livekit_participants_active > 500
+        for: 15m
+        labels:
+          severity: warning
+          component: livekit-participants
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-participants"
+        annotations:
+          summary: "High number of active participants"
+          description: "{{ $value }} participants are currently connected"
+          impact: "Monitor bandwidth and CPU usage"
+
+      # Warning: Track Publishing Failures
+      - alert: LiveKitTrackPublishingFailures
+        expr: |
+          rate(livekit_track_publish_failed_total[10m]) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          component: livekit-tracks
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/track-failures"
+        annotations:
+          summary: "Track publishing failures detected"
+          description: "Track publishing failure rate is {{ $value }} failures/sec"
+          impact: "Audio/video quality issues for users"
+
+  - name: livekit_performance_alerts
+    interval: 120s
+    rules:
+      # Performance: High WebRTC Latency
+      - alert: LiveKitHighWebRTCLatency
+        expr: |
+          histogram_quantile(0.95, 
+            rate(livekit_webrtc_rtt_seconds_bucket[10m])
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: livekit-webrtc
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/webrtc-latency"
+        annotations:
+          summary: "High WebRTC round-trip time"
+          description: "95th percentile WebRTC RTT is {{ $value }}s"
+          impact: "Poor audio quality and responsiveness"
+
+      # Performance: High Packet Loss
+      - alert: LiveKitHighPacketLoss
+        expr: |
+          (
+            rate(livekit_webrtc_packets_lost_total[10m]) / 
+            rate(livekit_webrtc_packets_sent_total[10m])
+          ) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          component: livekit-webrtc
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/packet-loss"
+        annotations:
+          summary: "High packet loss rate detected"
+          description: "Packet loss rate is {{ $value | humanizePercentage }}"
+          impact: "Audio quality degradation"
+
+      # Performance: Low Bandwidth Utilization
+      - alert: LiveKitLowBandwidthUtilization
+        expr: |
+          (
+            rate(livekit_webrtc_bytes_sent_total[10m]) + 
+            rate(livekit_webrtc_bytes_received_total[10m])
+          ) < 1024
+        for: 30m
+        labels:
+          severity: info
+          component: livekit-bandwidth
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/low-bandwidth"
+        annotations:
+          summary: "Low bandwidth utilization"
+          description: "Total bandwidth usage is {{ $value | humanize }}B/s"
+          impact: "Possible underutilization or connection issues"
+
+  - name: livekit_quality_metrics
+    interval: 300s
+    rules:
+      # Quality: Audio Quality Score
+      - alert: LiveKitLowAudioQuality
+        expr: |
+          avg_over_time(livekit_audio_quality_score[15m]) < 3.0
+        for: 15m
+        labels:
+          severity: warning
+          component: livekit-audio
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/audio-quality"
+        annotations:
+          summary: "Low audio quality score detected"
+          description: "Average audio quality score is {{ $value }} (scale 1-5)"
+          impact: "Poor user experience due to audio quality issues"
+
+      # Quality: Connection Stability
+      - alert: LiveKitConnectionInstability
+        expr: |
+          rate(livekit_connection_reconnects_total[1h]) > 0.1
+        for: 30m
+        labels:
+          severity: warning
+          component: livekit-connections
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/connection-stability"
+        annotations:
+          summary: "High connection reconnection rate"
+          description: "Connection reconnection rate is {{ $value }} reconnects/sec"
+          impact: "Unstable connections affecting user experience"
+
+      # Quality: Egress Failures
+      - alert: LiveKitEgressFailures
+        expr: |
+          rate(livekit_egress_failed_total[10m]) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          component: livekit-egress
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/egress-failures"
+        annotations:
+          summary: "LiveKit egress failures detected"
+          description: "Egress failure rate is {{ $value }} failures/sec"
+          impact: "Recording or streaming functionality affected"

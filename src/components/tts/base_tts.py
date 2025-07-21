@@ -10,9 +10,17 @@ from typing import Optional, Dict, Any, AsyncIterator, Union, List
 from enum import Enum
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 
-logger = logging.getLogger(__name__)
+from ...monitoring.structured_logging import (
+    StructuredLogger, 
+    timed_operation, 
+    CorrelationIdManager
+)
+from ...monitoring.logging_middleware import pipeline_tracker
+
+logger = StructuredLogger(__name__, "tts")
 
 
 class TTSVoice(Enum):
@@ -149,7 +157,8 @@ class BaseTTSProvider(ABC):
         self.config = config
         self._is_streaming = False
         self._stream_task = None
-        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = StructuredLogger(f"{__name__}.{self.__class__.__name__}", "tts")
+        self._current_pipeline_id = None
     
     @property
     @abstractmethod
@@ -243,6 +252,134 @@ class BaseTTSProvider(ABC):
         """
         effective_voice_id = voice_id or self.config.voice_id
         return await self.synthesize_speech(text, effective_voice_id)
+    
+    async def speak_with_logging(
+        self,
+        text: str,
+        voice_id: Optional[str] = None,
+        pipeline_id: Optional[str] = None
+    ) -> TTSResult:
+        """
+        High-level method to synthesize speech with structured logging and correlation tracking.
+        
+        Args:
+            text: Text to speak
+            voice_id: Optional voice ID override
+            pipeline_id: Optional pipeline ID for correlation
+            
+        Returns:
+            TTSResult with audio data
+        """
+        start_time = time.time()
+        effective_voice_id = voice_id or self.config.voice_id
+        
+        # Set pipeline context if provided
+        if pipeline_id:
+            self._current_pipeline_id = pipeline_id
+            await pipeline_tracker.log_stage_start(
+                pipeline_id,
+                "tts",
+                self.provider_name,
+                {
+                    "text_length": len(text),
+                    "provider": self.provider_name,
+                    "voice_id": effective_voice_id,
+                    "language": self.config.language.value if hasattr(self.config, 'language') else None,
+                    "quality": self.config.quality.value if hasattr(self.config, 'quality') else None,
+                    "speaking_rate": self.config.speaking_rate if hasattr(self.config, 'speaking_rate') else None
+                }
+            )
+        
+        # Log operation start
+        self.logger.log_operation_start(
+            "speak",
+            extra_data={
+                "text_length": len(text),
+                "provider": self.provider_name,
+                "voice_id": effective_voice_id,
+                "pipeline_id": pipeline_id
+            }
+        )
+        
+        try:
+            # Perform synthesis
+            result = await self.speak(text, voice_id)
+            
+            duration = time.time() - start_time
+            
+            # Log successful completion
+            self.logger.log_operation_end(
+                "speak",
+                duration,
+                True,
+                extra_data={
+                    "audio_size_bytes": len(result.audio_data),
+                    "audio_duration": result.duration,
+                    "audio_format": result.format.value if hasattr(result.format, 'value') else str(result.format),
+                    "sample_rate": result.sample_rate,
+                    "provider": self.provider_name,
+                    "voice_id": effective_voice_id,
+                    "pipeline_id": pipeline_id
+                }
+            )
+            
+            # Log performance metrics
+            self.logger.log_performance_metrics(
+                "speak",
+                {
+                    "duration_ms": duration * 1000,
+                    "text_length": len(text),
+                    "audio_size_bytes": len(result.audio_data),
+                    "audio_duration": result.duration,
+                    "provider": self.provider_name,
+                    "characters_per_second": len(text) / duration if duration > 0 else 0,
+                    "audio_generation_ratio": (result.duration / duration) if (duration > 0 and result.duration) else 0
+                }
+            )
+            
+            # Log pipeline stage completion
+            if pipeline_id:
+                await pipeline_tracker.log_stage_end(
+                    pipeline_id,
+                    "tts",
+                    True,
+                    {
+                        "audio_size_bytes": len(result.audio_data),
+                        "audio_duration": result.duration,
+                        "audio_format": result.format.value if hasattr(result.format, 'value') else str(result.format),
+                        "sample_rate": result.sample_rate,
+                        "voice_id": effective_voice_id
+                    }
+                )
+            
+            return result
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            
+            # Log error
+            self.logger.exception(
+                f"TTS synthesis failed: {e}",
+                extra_data={
+                    "provider": self.provider_name,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "text_length": len(text),
+                    "voice_id": effective_voice_id,
+                    "pipeline_id": pipeline_id
+                }
+            )
+            
+            # Log pipeline stage failure
+            if pipeline_id:
+                await pipeline_tracker.log_stage_end(
+                    pipeline_id,
+                    "tts",
+                    False,
+                    error=str(e)
+                )
+            
+            raise
     
     async def speak_streaming(
         self, 

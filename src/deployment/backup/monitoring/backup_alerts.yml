@@ -1,0 +1,311 @@
+# Backup and Disaster Recovery Alerts for Prometheus
+# Critical alerts for backup operations and recovery readiness
+
+groups:
+  - name: backup_critical_alerts
+    interval: 30s
+    rules:
+      # Critical: Backup Job Failed
+      - alert: BackupJobFailed
+        expr: |
+          (
+            increase(voice_agent_backup_total{status="failed"}[1h]) > 0
+          )
+        for: 5m
+        labels:
+          severity: critical
+          component: backup
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/backup-failure"
+        annotations:
+          summary: "Backup job failed for {{ $labels.type }}"
+          description: "Backup job for {{ $labels.type }} has failed within the last hour"
+          impact: "Risk of data loss if primary storage fails"
+          action: "Investigate backup logs and retry failed backup"
+
+      # Critical: No Recent Backup
+      - alert: BackupTooOld
+        expr: |
+          (
+            time() - voice_agent_backup_last_success_timestamp > 86400
+          )
+        for: 15m
+        labels:
+          severity: critical
+          component: backup
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/backup-overdue"
+        annotations:
+          summary: "No recent backup for {{ $labels.type }}"
+          description: "Last successful backup for {{ $labels.type }} was {{ $value | humanizeDuration }} ago"
+          impact: "Increasing risk of data loss with each passing hour"
+          action: "Check backup service health and run manual backup if needed"
+
+      # Critical: Backup Verification Failed
+      - alert: BackupVerificationFailed
+        expr: voice_agent_backup_verification_status == 0
+        for: 10m
+        labels:
+          severity: critical
+          component: backup
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/backup-verification"
+        annotations:
+          summary: "Backup verification failed for {{ $labels.type }}"
+          description: "Backup integrity check failed for {{ $labels.type }}"
+          impact: "Backup may be corrupted and unreliable for restore"
+          action: "Re-run backup with verification and investigate storage issues"
+
+      # Critical: Restore Test Failed
+      - alert: RestoreTestFailed
+        expr: |
+          (
+            increase(backup_restore_test_failures_total[24h]) > 0
+          )
+        for: 5m
+        labels:
+          severity: critical
+          component: disaster-recovery
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/restore-test-failure"
+        annotations:
+          summary: "Restore test failed for {{ $labels.type }}"
+          description: "Automated restore test failed for {{ $labels.type }}"
+          impact: "May not be able to recover data in case of disaster"
+          action: "Investigate restore process and fix underlying issues"
+
+      # Critical: Storage Space Low
+      - alert: BackupStorageLow
+        expr: |
+          (
+            backup_storage_free_bytes / backup_storage_total_bytes < 0.1
+          )
+        for: 10m
+        labels:
+          severity: critical
+          component: backup-storage
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/storage-full"
+        annotations:
+          summary: "Backup storage space critically low"
+          description: "Only {{ $value | humanizePercentage }} of backup storage remaining"
+          impact: "Future backups will fail when storage is full"
+          action: "Clean up old backups or expand storage capacity"
+
+  - name: backup_warning_alerts
+    interval: 60s
+    rules:
+      # Warning: Backup Duration Increasing
+      - alert: BackupSlowingDown
+        expr: |
+          (
+            avg_over_time(voice_agent_backup_duration_seconds[24h]) > 
+            avg_over_time(voice_agent_backup_duration_seconds[7d] offset 7d) * 1.5
+          )
+        for: 30m
+        labels:
+          severity: warning
+          component: backup
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/slow-backups"
+        annotations:
+          summary: "Backup duration increasing for {{ $labels.type }}"
+          description: "Backup time has increased by 50% compared to last week"
+          impact: "Backup windows may start overlapping, affecting performance"
+          action: "Investigate backup performance and optimize if needed"
+
+      # Warning: High Backup Failure Rate
+      - alert: BackupHighFailureRate
+        expr: |
+          (
+            rate(voice_agent_backup_total{status="failed"}[24h]) / 
+            rate(voice_agent_backup_total[24h]) > 0.1
+          )
+        for: 1h
+        labels:
+          severity: warning
+          component: backup
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/backup-failure-rate"
+        annotations:
+          summary: "High backup failure rate detected"
+          description: "{{ $value | humanizePercentage }} of backups are failing"
+          impact: "Reduced backup reliability and coverage"
+          action: "Review backup logs and address common failure causes"
+
+      # Warning: Backup Size Anomaly
+      - alert: BackupSizeAnomaly
+        expr: |
+          (
+            abs(
+              voice_agent_backup_size_bytes - 
+              avg_over_time(voice_agent_backup_size_bytes[7d] offset 1d)
+            ) / avg_over_time(voice_agent_backup_size_bytes[7d] offset 1d) > 0.5
+          )
+        for: 2h
+        labels:
+          severity: warning
+          component: backup
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/backup-size-anomaly"
+        annotations:
+          summary: "Backup size anomaly detected for {{ $labels.type }}"
+          description: "Backup size has changed by more than 50% from recent average"
+          impact: "May indicate data corruption or unexpected data growth"
+          action: "Investigate data changes and verify backup integrity"
+
+      # Warning: Storage Usage Growing
+      - alert: BackupStorageGrowing
+        expr: |
+          (
+            voice_agent_backup_storage_usage_bytes > 
+            voice_agent_backup_storage_usage_bytes offset 7d * 1.2
+          )
+        for: 4h
+        labels:
+          severity: warning
+          component: backup-storage
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/storage-growth"
+        annotations:
+          summary: "Backup storage usage growing rapidly"
+          description: "Storage usage increased by 20% in the last week"
+          impact: "May run out of storage space soon"
+          action: "Review retention policies and clean up old backups"
+
+      # Warning: Cross-Region Replication Lag
+      - alert: BackupReplicationLag
+        expr: |
+          (
+            backup_replication_lag_seconds > 1800
+          )
+        for: 15m
+        labels:
+          severity: warning
+          component: backup-replication
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/replication-lag"
+        annotations:
+          summary: "Backup replication lag high"
+          description: "Cross-region backup replication is {{ $value | humanizeDuration }} behind"
+          impact: "Disaster recovery may use stale data"
+          action: "Check network connectivity and replication service health"
+
+  - name: backup_info_alerts
+    interval: 300s
+    rules:
+      # Info: Backup Completed Successfully
+      - alert: BackupCompleted
+        expr: |
+          (
+            increase(voice_agent_backup_total{status="success"}[1h]) > 0
+          )
+        for: 0s
+        labels:
+          severity: info
+          component: backup
+        annotations:
+          summary: "Backup completed successfully for {{ $labels.type }}"
+          description: "Backup for {{ $labels.type }} completed in {{ $labels.duration }}s"
+
+      # Info: Large Backup Detected
+      - alert: LargeBackupSize
+        expr: voice_agent_backup_size_bytes > 10737418240  # 10GB
+        for: 0s
+        labels:
+          severity: info
+          component: backup
+        annotations:
+          summary: "Large backup detected for {{ $labels.type }}"
+          description: "Backup size is {{ $value | humanizeBytes }}"
+          action: "Monitor storage usage and consider retention policy adjustments"
+
+      # Info: Restore Test Passed
+      - alert: RestoreTestPassed
+        expr: |
+          (
+            increase(backup_restore_test_success_total[24h]) > 0
+          )
+        for: 0s
+        labels:
+          severity: info
+          component: disaster-recovery
+        annotations:
+          summary: "Restore test completed successfully for {{ $labels.type }}"
+          description: "Automated restore test passed for {{ $labels.type }}"
+
+  - name: disaster_recovery_alerts
+    interval: 60s
+    rules:
+      # Critical: DR Environment Down
+      - alert: DREnvironmentDown
+        expr: up{job="disaster-recovery"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: disaster-recovery
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/dr-environment"
+        annotations:
+          summary: "Disaster recovery environment is down"
+          description: "DR environment {{ $labels.instance }} is not responding"
+          impact: "Cannot failover in case of disaster"
+          action: "Investigate DR environment health and restore service"
+
+      # Critical: DR Data Sync Failed
+      - alert: DRDataSyncFailed
+        expr: |
+          (
+            time() - dr_last_sync_timestamp > 7200
+          )
+        for: 10m
+        labels:
+          severity: critical
+          component: disaster-recovery
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/dr-sync-failure"
+        annotations:
+          summary: "DR data synchronization failed"
+          description: "DR data sync is {{ $value | humanizeDuration }} behind"
+          impact: "DR environment has stale data for recovery"
+          action: "Check data sync processes and network connectivity"
+
+      # Warning: DR Test Overdue
+      - alert: DRTestOverdue
+        expr: |
+          (
+            time() - dr_last_test_timestamp > 604800
+          )
+        for: 1h
+        labels:
+          severity: warning
+          component: disaster-recovery
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/dr-testing"
+        annotations:
+          summary: "DR test is overdue"
+          description: "Last DR test was {{ $value | humanizeDuration }} ago"
+          impact: "Unknown DR readiness"
+          action: "Schedule and execute DR test"
+
+  - name: backup_business_metrics
+    interval: 900s  # 15 minutes
+    rules:
+      # Business: Recovery Time Objective (RTO) Exceeded
+      - alert: RTOExceeded
+        expr: |
+          (
+            backup_last_restore_duration_seconds > 7200
+          )
+        for: 0s
+        labels:
+          severity: warning
+          component: business-continuity
+        annotations:
+          summary: "Recovery Time Objective exceeded"
+          description: "Last restore took {{ $value | humanizeDuration }}, exceeding RTO of 2 hours"
+          impact: "Business continuity targets not being met"
+          action: "Review and optimize restore procedures"
+
+      # Business: Recovery Point Objective (RPO) at Risk
+      - alert: RPOAtRisk
+        expr: |
+          (
+            voice_agent_backup_age_hours > 4
+          )
+        for: 1h
+        labels:
+          severity: warning
+          component: business-continuity
+        annotations:
+          summary: "Recovery Point Objective at risk"
+          description: "Data could be lost up to {{ $value }} hours old"
+          impact: "Exceeds business RPO requirements"
+          action: "Increase backup frequency or investigate backup delays"

@@ -1,0 +1,166 @@
+# Docker Compose configuration for Backup and Disaster Recovery
+# Provides automated backup services for LiveKit Voice Agents Platform
+
+version: '3.8'
+
+services:
+  # Backup Manager Service
+  backup-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: voice-agent-backup-manager
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=voice_agents
+      - POSTGRES_USER=agent
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - PAGERDUTY_KEY=${PAGERDUTY_KEY}
+    volumes:
+      - ./backup_config.yaml:/app/backup_config.yaml:ro
+      - ./scripts:/app/scripts:ro
+      - backup-temp:/tmp
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - voice-agents-network
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:9091/metrics')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # Backup Monitor Service
+  backup-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: voice-agent-backup-monitor
+    command: ["python", "/app/scripts/backup_monitor.py", "/app/backup_config.yaml"]
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=agent
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - PAGERDUTY_KEY=${PAGERDUTY_KEY}
+    volumes:
+      - ./backup_config.yaml:/app/backup_config.yaml:ro
+      - ./scripts:/app/scripts:ro
+    networks:
+      - voice-agents-network
+    ports:
+      - "9091:9091"  # Prometheus metrics
+    depends_on:
+      - backup-manager
+    restart: unless-stopped
+
+  # Restore Testing Service (runs periodically)
+  restore-tester:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: voice-agent-restore-tester
+    command: ["sh", "-c", "while true; do python /app/scripts/restore_tester.py; sleep 86400; done"]
+    environment:
+      - ENVIRONMENT=test
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - POSTGRES_HOST=postgres-test
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=voice_agents_test
+      - POSTGRES_USER=agent
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis-test
+      - REDIS_PORT=6379
+    volumes:
+      - ./backup_config.yaml:/app/backup_config.yaml:ro
+      - ./scripts:/app/scripts:ro
+      - restore-test-data:/data/restore-test
+    networks:
+      - voice-agents-network
+    depends_on:
+      - postgres-test
+      - redis-test
+    restart: unless-stopped
+
+  # Test PostgreSQL for restore testing
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: voice-agent-postgres-test
+    environment:
+      - POSTGRES_DB=voice_agents_test
+      - POSTGRES_USER=agent
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+
+  # Test Redis for restore testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: voice-agent-redis-test
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-test-data:/data
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+
+  # MinIO for local S3-compatible storage (development/testing)
+  minio:
+    image: minio/minio:latest
+    container_name: voice-agent-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  backup-temp:
+    driver: local
+  postgres-test-data:
+    driver: local
+  redis-test-data:
+    driver: local
+  restore-test-data:
+    driver: local
+  minio-data:
+    driver: local
+
+networks:
+  voice-agents-network:
+    external: true

@@ -1,0 +1,257 @@
+# Infrastructure Alerting Rules
+# System-level alerts for supporting services
+
+groups:
+  - name: infrastructure_critical_alerts
+    interval: 30s
+    rules:
+      # Critical: Node Down
+      - alert: NodeDown
+        expr: up{job="node-exporter"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/node-down"
+        annotations:
+          summary: "Node {{ $labels.instance }} is down"
+          description: "Node {{ $labels.instance }} has been down for more than 5 minutes"
+          impact: "Reduced capacity for voice agent workloads"
+
+      # Critical: Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"} / 
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/disk-space"
+        annotations:
+          summary: "Critical disk space shortage"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining on {{ $labels.instance }}"
+          impact: "Risk of service failure due to disk full"
+
+      # Critical: High Load Average
+      - alert: HighLoadAverage
+        expr: node_load15 > (count by (instance) (node_cpu_seconds_total{mode="idle"}) * 2)
+        for: 10m
+        labels:
+          severity: critical
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-load"
+        annotations:
+          summary: "High system load average"
+          description: "15-minute load average is {{ $value }} on {{ $labels.instance }}"
+          impact: "System performance severely degraded"
+
+      # Critical: Out of Memory
+      - alert: OutOfMemory
+        expr: |
+          (
+            node_memory_MemAvailable_bytes / 
+            node_memory_MemTotal_bytes
+          ) < 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/out-of-memory"
+        annotations:
+          summary: "System running out of memory"
+          description: "Only {{ $value | humanizePercentage }} memory available on {{ $labels.instance }}"
+          impact: "Risk of OOM kills and service failures"
+
+  - name: infrastructure_warning_alerts
+    interval: 60s
+    rules:
+      # Warning: High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (
+            avg by (instance) (
+              rate(node_cpu_seconds_total{mode="idle"}[5m])
+            ) * 100
+          ) > 85
+        for: 15m
+        labels:
+          severity: warning
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-cpu"
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+          impact: "Performance degradation possible"
+
+      # Warning: High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+          ) > 0.8
+        for: 15m
+        labels:
+          severity: warning
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-memory"
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          impact: "Monitor for potential memory exhaustion"
+
+      # Warning: Disk Space Warning
+      - alert: DiskSpaceWarning
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"} / 
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/disk-warning"
+        annotations:
+          summary: "Disk space running low"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining on {{ $labels.instance }}"
+          impact: "Plan for disk cleanup or expansion"
+
+      # Warning: High Network Traffic
+      - alert: HighNetworkTraffic
+        expr: |
+          rate(node_network_receive_bytes_total{device!="lo"}[5m]) + 
+          rate(node_network_transmit_bytes_total{device!="lo"}[5m]) > 100000000
+        for: 15m
+        labels:
+          severity: warning
+          component: infrastructure
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-network"
+        annotations:
+          summary: "High network traffic detected"
+          description: "Network traffic is {{ $value | humanize }}B/s on {{ $labels.instance }}"
+          impact: "Potential bandwidth constraints"
+
+  - name: database_alerts
+    interval: 60s
+    rules:
+      # Critical: PostgreSQL Down
+      - alert: PostgreSQLDown
+        expr: up{job="postgres-monitoring"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: postgres
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/postgres-down"
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL on {{ $labels.instance }} has been down for more than 2 minutes"
+          impact: "Voice agent data persistence unavailable"
+
+      # Critical: High Database Connections
+      - alert: PostgreSQLHighConnections
+        expr: |
+          (
+            pg_stat_database_numbackends / 
+            pg_settings_max_connections
+          ) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: postgres
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/postgres-connections"
+        annotations:
+          summary: "PostgreSQL connection limit almost reached"
+          description: "{{ $value | humanizePercentage }} of max connections in use"
+          impact: "New connections may be rejected"
+
+      # Warning: Slow Queries
+      - alert: PostgreSQLSlowQueries
+        expr: |
+          rate(pg_stat_statement_mean_time_ms[5m]) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: postgres
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/slow-queries"
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Average query time is {{ $value }}ms"
+          impact: "Database performance degradation"
+
+      # Critical: Redis Down
+      - alert: RedisDown
+        expr: up{job="redis-monitoring"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: redis
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/redis-down"
+        annotations:
+          summary: "Redis is down"
+          description: "Redis on {{ $labels.instance }} has been down for more than 2 minutes"
+          impact: "Session state and caching unavailable"
+
+      # Warning: High Redis Memory Usage
+      - alert: RedisHighMemoryUsage
+        expr: |
+          (
+            redis_memory_used_bytes / 
+            redis_config_maxmemory
+          ) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: redis
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/redis-memory"
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+          impact: "Risk of eviction or OOM"
+
+  - name: container_alerts
+    interval: 60s
+    rules:
+      # Warning: Container Restart
+      - alert: ContainerRestart
+        expr: |
+          rate(kube_pod_container_status_restarts_total[1h]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: containers
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/container-restart"
+        annotations:
+          summary: "Container restart rate is high"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is restarting frequently"
+          impact: "Potential service instability"
+
+      # Critical: Container Out of Memory
+      - alert: ContainerOOMKilled
+        expr: |
+          increase(kube_pod_container_status_terminated_reason{reason="OOMKilled"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: containers
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/oom-killed"
+        annotations:
+          summary: "Container killed due to OOM"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was OOM killed"
+          impact: "Service disruption due to memory constraints"
+
+      # Warning: Container CPU Throttling
+      - alert: ContainerCPUThrottling
+        expr: |
+          rate(container_cpu_cfs_throttled_seconds_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: containers
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/cpu-throttling"
+        annotations:
+          summary: "Container CPU is being throttled"
+          description: "Container {{ $labels.container }} CPU throttling rate is {{ $value }}"
+          impact: "Performance degradation due to CPU limits"

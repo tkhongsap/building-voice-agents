@@ -1,0 +1,296 @@
+# Enhanced Prometheus Configuration for LiveKit Voice Agents Platform
+# Advanced monitoring, metrics collection, and alerting for voice agent workloads
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'voice-agents-platform'
+    environment: 'production'
+    region: 'us-west-2'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - 'alertmanager:9093'
+      timeout: 30s
+      api_version: v2
+
+# Load rules from multiple files
+rule_files:
+  - "voice_agent_rules.yml"
+  - "livekit_rules.yml"
+  - "infrastructure_rules.yml"
+  - "recording_rules.yml"
+  - "/app/backup/monitoring/backup_alerts.yml"
+
+# Enhanced scrape configurations with service discovery
+scrape_configs:
+  # Prometheus self-monitoring with enhanced metrics
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    honor_timestamps: true
+
+  # Voice Agent main service with detailed configuration
+  - job_name: 'voice-agent-main'
+    static_configs:
+      - targets: 
+          - 'voice-agent:8080'
+          - 'voice-agent-api:8080'
+    scrape_interval: 10s
+    scrape_timeout: 8s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      # Keep only voice agent specific metrics
+      - source_labels: [__name__]
+        regex: '(voice_agent_.*|http_requests_.*|worker_.*|session_.*|audio_.*)'
+        action: keep
+      # Add service label
+      - target_label: service
+        replacement: 'voice-agent-main'
+      # Add environment label
+      - target_label: environment
+        replacement: 'production'
+
+  # Voice Agent workers with dynamic discovery
+  - job_name: 'voice-agent-workers'
+    static_configs:
+      - targets: 
+          - 'voice-agent-worker-1:8080'
+          - 'voice-agent-worker-2:8080'
+          - 'voice-agent-worker-3:8080'
+    scrape_interval: 10s
+    scrape_timeout: 8s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      # Worker-specific metrics
+      - source_labels: [__name__]
+        regex: '(worker_.*|job_.*|queue_.*|audio_processing_.*|pipeline_.*)'
+        action: keep
+      - target_label: service
+        replacement: 'voice-agent-worker'
+
+  # LiveKit Server with enhanced metrics collection
+  - job_name: 'livekit-server'
+    static_configs:
+      - targets: ['livekit:7880']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      # LiveKit specific metrics
+      - source_labels: [__name__]
+        regex: '(livekit_.*|webrtc_.*|room_.*|participant_.*|track_.*|connection_.*)'
+        action: keep
+      - target_label: service
+        replacement: 'livekit'
+
+  # Redis metrics with connection pooling monitoring
+  - job_name: 'redis-monitoring'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(redis_.*)'
+        action: keep
+
+  # PostgreSQL metrics with query performance monitoring
+  - job_name: 'postgres-monitoring'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(pg_.*|postgres_.*)'
+        action: keep
+
+  # NGINX metrics with voice agent specific configurations
+  - job_name: 'nginx-monitoring'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(nginx_.*|http_.*)'
+        action: keep
+
+  # Container and system metrics via cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      # Focus on voice agent containers
+      - source_labels: [container_label_com_docker_compose_service]
+        regex: '(voice-agent.*|livekit|redis|postgres)'
+        action: keep
+      - source_labels: [__name__]
+        regex: '(container_.*)'
+        action: keep
+
+  # Node exporter for system-level metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(node_.*|up)'
+        action: keep
+
+  # Custom voice pipeline metrics
+  - job_name: 'voice-pipeline-metrics'
+    static_configs:
+      - targets: 
+          - 'voice-agent:8080'
+    scrape_interval: 5s  # Higher frequency for real-time voice metrics
+    scrape_timeout: 4s
+    metrics_path: /voice-metrics
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(audio_.*|speech_.*|nlp_.*|tts_.*|latency_.*|pipeline_.*)'
+        action: keep
+
+  # Worker orchestration metrics
+  - job_name: 'worker-orchestrator'
+    static_configs:
+      - targets: ['voice-agent:8080']
+    scrape_interval: 10s
+    metrics_path: /orchestrator-metrics
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(orchestrator_.*|worker_pool_.*|scaling_.*)'
+        action: keep
+
+  # Load balancer metrics
+  - job_name: 'load-balancer'
+    static_configs:
+      - targets: ['nginx:80']
+    scrape_interval: 15s
+    metrics_path: /lb-metrics
+    honor_labels: true
+
+  # Backup and Recovery monitoring
+  - job_name: 'backup-monitor'
+    static_configs:
+      - targets: ['backup-monitor:9091']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(voice_agent_backup_.*|backup_.*|dr_.*)'
+        action: keep
+      - target_label: service
+        replacement: 'backup-monitor'
+
+  # Kubernetes cluster metrics (if running in k8s)
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - voice-agents-dev
+            - voice-agents-staging
+            - voice-agents-prod
+    relabel_configs:
+      # Only scrape pods with prometheus.io/scrape annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      # Use custom metrics path if specified
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      # Use custom port if specified
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      # Add kubernetes labels as metric labels
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: "https://prometheus-remote-write.example.com/api/v1/write"
+    name: "long-term-storage"
+    queue_config:
+      max_samples_per_send: 10000
+      batch_send_deadline: 5s
+      min_shards: 1
+      max_shards: 200
+      capacity: 100000
+    metadata_config:
+      send: true
+      send_interval: 30s
+
+# Remote read configuration for querying historical data
+remote_read:
+  - url: "https://prometheus-remote-read.example.com/api/v1/read"
+    name: "long-term-storage"
+    read_recent: false
+
+# Storage configuration optimized for voice agent metrics
+storage:
+  tsdb:
+    # Retention period for local storage
+    retention: "30d"
+    # Retention size limit
+    retention_size: "50GB"
+    # Compression for better storage efficiency
+    wal_compression: true
+    # Block chunk range for optimization
+    min_block_duration: "2h"
+    max_block_duration: "2h"
+    # Enable native histograms for better latency tracking
+    enable_native_histograms: true
+
+# Web configuration
+web:
+  # External URL for proper link generation
+  external_url: "https://prometheus.voice-agents.example.com"
+  # Enable admin API for runtime configuration
+  enable_admin_api: true
+  # Enable lifecycle endpoints for reloading
+  enable_lifecycle: true
+  # CORS configuration for Grafana integration
+  cors:
+    origin: ".*"
+
+# Feature flags for experimental features
+feature_flags:
+  # Enable native histograms for latency metrics
+  - enable-feature=native-histograms
+  # Enable exemplars for tracing integration
+  - enable-feature=exemplar-storage

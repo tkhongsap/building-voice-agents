@@ -12,8 +12,16 @@ from dataclasses import dataclass
 import asyncio
 import logging
 import json
+import time
 
-logger = logging.getLogger(__name__)
+from ...monitoring.structured_logging import (
+    StructuredLogger, 
+    timed_operation, 
+    CorrelationIdManager
+)
+from ...monitoring.logging_middleware import pipeline_tracker
+
+logger = StructuredLogger(__name__, "llm")
 
 
 class LLMRole(Enum):
@@ -146,7 +154,8 @@ class BaseLLMProvider(ABC):
         self.config = config
         self._conversation_history: List[LLMMessage] = []
         self._is_streaming = False
-        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = StructuredLogger(f"{__name__}.{self.__class__.__name__}", "llm")
+        self._current_pipeline_id = None
         
         # Add system message if provided
         if config.system_message:
@@ -261,6 +270,128 @@ class BaseLLMProvider(ABC):
         self.add_message(LLMRole.ASSISTANT, response.content)
         
         return response
+    
+    async def chat_with_logging(
+        self,
+        user_message: str,
+        pipeline_id: Optional[str] = None
+    ) -> LLMResponse:
+        """
+        Send a user message and get a response with structured logging and correlation tracking.
+        
+        Args:
+            user_message: The user's message
+            pipeline_id: Optional pipeline ID for correlation
+            
+        Returns:
+            LLMResponse with assistant's reply
+        """
+        start_time = time.time()
+        
+        # Set pipeline context if provided
+        if pipeline_id:
+            self._current_pipeline_id = pipeline_id
+            await pipeline_tracker.log_stage_start(
+                pipeline_id,
+                "llm",
+                self.provider_name,
+                {
+                    "user_message_length": len(user_message),
+                    "conversation_length": len(self._conversation_history),
+                    "provider": self.provider_name,
+                    "model": self.config.model.value if hasattr(self.config, 'model') else None,
+                    "temperature": self.config.temperature if hasattr(self.config, 'temperature') else None
+                }
+            )
+        
+        # Log operation start
+        self.logger.log_operation_start(
+            "chat",
+            extra_data={
+                "user_message_length": len(user_message),
+                "conversation_length": len(self._conversation_history),
+                "provider": self.provider_name,
+                "model": self.config.model.value if hasattr(self.config, 'model') else None,
+                "pipeline_id": pipeline_id
+            }
+        )
+        
+        try:
+            # Perform chat
+            response = await self.chat(user_message)
+            
+            duration = time.time() - start_time
+            
+            # Log successful completion
+            self.logger.log_operation_end(
+                "chat",
+                duration,
+                True,
+                extra_data={
+                    "response_length": len(response.content),
+                    "finish_reason": response.finish_reason,
+                    "model": response.model,
+                    "usage": response.usage,
+                    "provider": self.provider_name,
+                    "pipeline_id": pipeline_id
+                }
+            )
+            
+            # Log performance metrics
+            self.logger.log_performance_metrics(
+                "chat",
+                {
+                    "duration_ms": duration * 1000,
+                    "input_length": len(user_message),
+                    "output_length": len(response.content),
+                    "provider": self.provider_name,
+                    "model": response.model,
+                    "tokens_per_second": (response.usage.get("total_tokens", 0) / duration) if (duration > 0 and response.usage) else 0
+                }
+            )
+            
+            # Log pipeline stage completion
+            if pipeline_id:
+                await pipeline_tracker.log_stage_end(
+                    pipeline_id,
+                    "llm",
+                    True,
+                    {
+                        "response": response.content,
+                        "response_length": len(response.content),
+                        "finish_reason": response.finish_reason,
+                        "model": response.model,
+                        "usage": response.usage
+                    }
+                )
+            
+            return response
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            
+            # Log error
+            self.logger.exception(
+                f"LLM chat failed: {e}",
+                extra_data={
+                    "provider": self.provider_name,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "user_message_length": len(user_message),
+                    "pipeline_id": pipeline_id
+                }
+            )
+            
+            # Log pipeline stage failure
+            if pipeline_id:
+                await pipeline_tracker.log_stage_end(
+                    pipeline_id,
+                    "llm",
+                    False,
+                    error=str(e)
+                )
+            
+            raise
     
     async def chat_streaming(self, user_message: str) -> AsyncIterator[LLMResponse]:
         """

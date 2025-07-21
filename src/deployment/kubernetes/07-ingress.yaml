@@ -1,0 +1,456 @@
+# Ingress configurations for LiveKit Voice Agents Platform
+# Provides external access with SSL/TLS termination and path-based routing
+
+---
+# NGINX Ingress Controller Installation (if needed)
+# Run: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+
+---
+# Voice Agent Ingress - Development
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: voice-agent-ingress
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: ingress
+    environment: development
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    # CORS
+    nginx.ingress.kubernetes.io/cors-enabled: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Requested-With"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: dev-voice-agents.example.com
+      http:
+        paths:
+          # Main API routes
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          # WebSocket connections
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          # Health checks
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          # Metrics endpoint
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 9090
+          # LiveKit endpoints
+          - path: /livekit
+            pathType: Prefix
+            backend:
+              service:
+                name: livekit-service
+                port:
+                  number: 7880
+          # Default route
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+
+---
+# Voice Agent Ingress - Staging
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: voice-agent-ingress
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: ingress
+    environment: staging
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options DENY;
+      add_header X-Content-Type-Options nosniff;
+      add_header X-XSS-Protection "1; mode=block";
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # CORS
+    nginx.ingress.kubernetes.io/cors-enabled: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://staging-frontend.example.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Requested-With"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    # Certificate issuer
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - staging-voice-agents.example.com
+      secretName: staging-tls-secret
+  rules:
+    - host: staging-voice-agents.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          - path: /livekit
+            pathType: Prefix
+            backend:
+              service:
+                name: livekit-service
+                port:
+                  number: 7880
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+
+---
+# Voice Agent Ingress - Production
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: voice-agent-ingress
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: ingress
+    environment: production
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "128m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    # WebSocket support with longer timeouts
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_cache_bypass $http_upgrade;
+    # Enhanced rate limiting for production
+    nginx.ingress.kubernetes.io/rate-limit: "500"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-burst: "100"
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options DENY always;
+      add_header X-Content-Type-Options nosniff always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' wss: https:; frame-ancestors 'none';" always;
+    # CORS for production
+    nginx.ingress.kubernetes.io/cors-enabled: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://voice-agents.example.com,https://app.example.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Requested-With, X-API-Key"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+    # Certificate issuer
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Additional performance optimizations
+    nginx.ingress.kubernetes.io/use-gzip: "true"
+    nginx.ingress.kubernetes.io/gzip-level: "6"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "1m"
+    # Session affinity for WebSocket connections
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "voice-agent-session"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "3600"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - voice-agents.example.com
+        - api.voice-agents.example.com
+      secretName: production-tls-secret
+  rules:
+    # Main application domain
+    - host: voice-agents.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+          - path: /livekit
+            pathType: Prefix
+            backend:
+              service:
+                name: livekit-service
+                port:
+                  number: 7880
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+    # API-specific domain
+    - host: api.voice-agents.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: voice-agent-service
+                port:
+                  number: 8080
+
+---
+# Monitoring Ingress - Shared across environments
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: monitoring
+    environment: shared
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - Voice Agents Monitoring'
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options SAMEORIGIN always;
+      add_header X-Content-Type-Options nosniff always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - monitoring.voice-agents.example.com
+      secretName: monitoring-tls-secret
+  rules:
+    - host: monitoring.voice-agents.example.com
+      http:
+        paths:
+          # Prometheus
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-service
+                port:
+                  number: 9090
+          # Grafana
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000
+          # Jaeger
+          - path: /jaeger
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger-service
+                port:
+                  number: 16686
+          # Default to Grafana
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000
+
+---
+# Basic Auth Secret for Monitoring (example)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-basic-auth
+  namespace: voice-agents-monitoring
+type: Opaque
+data:
+  # Generated using: htpasswd -nb admin secure_password | base64
+  # Username: admin, Password: secure_password
+  auth: YWRtaW46JGFwcjEkSDY1Tk5PTzAkUVNORGczNS5oa2xtVUJiVlFjMmt6MQo=
+
+---
+# Certificate Issuers (ClusterIssuer resources)
+# Staging Certificate Issuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@example.com
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+
+---
+# Production Certificate Issuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+
+---
+# Custom Error Pages ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-error-pages
+  namespace: voice-agents-prod
+data:
+  "404.html": |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>404 - Page Not Found</title>
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+            .error { color: #e74c3c; font-size: 48px; }
+            .message { font-size: 18px; color: #7f8c8d; }
+        </style>
+    </head>
+    <body>
+        <div class="error">404</div>
+        <div class="message">Page Not Found - Voice Agents Platform</div>
+    </body>
+    </html>
+  "50x.html": |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>500 - Internal Server Error</title>
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+            .error { color: #e74c3c; font-size: 48px; }
+            .message { font-size: 18px; color: #7f8c8d; }
+        </style>
+    </head>
+    <body>
+        <div class="error">500</div>
+        <div class="message">Internal Server Error - Voice Agents Platform</div>
+    </body>
+    </html>

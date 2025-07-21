@@ -1,0 +1,136 @@
+# Docker ignore file for LiveKit Voice Agents Platform
+# Optimizes build context and improves security
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+docs/_build/
+*.md
+README*
+CHANGELOG*
+LICENSE*
+
+# Test files and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.tox/
+
+# Development tools
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Logs
+*.log
+logs/
+
+# Cache directories
+.cache/
+cache/
+.npm/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Development configurations
+docker-compose.override.yml
+.env.local
+.env.development
+.env.test
+
+# Node.js (if any frontend components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Kubernetes manifests (included separately)
+k8s/
+kubernetes/
+
+# Terraform (if used for infrastructure)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Security sensitive files
+*.pem
+*.key
+*.crt
+secrets/
+.secrets/
+
+# Large media files that shouldn't be in container
+*.wav
+*.mp3
+*.mp4
+*.avi
+media/
+
+# Backup files
+*.backup
+*.bak
+
+# Build artifacts
+build/
+dist/
+target/

@@ -1,0 +1,269 @@
+# Security Scanning Configuration for Voice Agents Platform
+# Comprehensive security and vulnerability management settings
+
+security:
+  # Global security scanning settings
+  global:
+    scan_frequency: "daily"
+    severity_threshold: "HIGH"
+    auto_remediation: false
+    notifications_enabled: true
+    report_retention_days: 90
+    compliance_frameworks:
+      - "CIS-1.6"
+      - "NIST-800-53"
+      - "SOC2"
+    
+  # Container vulnerability scanning
+  container_scanning:
+    enabled: true
+    scanners:
+      trivy:
+        enabled: true
+        image: "aquasec/trivy:latest"
+        severity_levels: ["UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        scan_types: ["vuln", "secret", "config"]
+        db_repositories: ["ghcr.io/aquasecurity/trivy-db"]
+        timeout: "15m"
+        exit_code: 1  # Fail build on vulnerabilities
+        cache_dir: "/tmp/trivy-cache"
+        config_file: "/security/trivy.yaml"
+      
+      grype:
+        enabled: true
+        image: "anchore/grype:latest"
+        severity_threshold: "medium"
+        scope: "all-layers"
+        output_format: "json"
+        fail_on_severity: "high"
+        
+      snyk:
+        enabled: false  # Requires license
+        image: "snyk/snyk:linux"
+        severity_threshold: "high"
+        test_all_projects: true
+    
+    # Registry scanning
+    registry_scanning:
+      enabled: true
+      schedule: "0 2 * * *"  # Daily at 2 AM
+      registries:
+        - name: "local"
+          url: "localhost:5000"
+          type: "docker"
+        - name: "dockerhub"
+          url: "docker.io"
+          type: "docker"
+      
+    # Build-time scanning
+    build_scanning:
+      enabled: true
+      fail_build_on: "HIGH"
+      parallel_scans: 3
+      scan_layers: true
+      scan_secrets: true
+      
+  # Dependency security scanning
+  dependency_scanning:
+    enabled: true
+    
+    python:
+      safety:
+        enabled: true
+        db_path: "/security/safety-db"
+        ignore_files: [".safety-ignore"]
+        output_format: "json"
+        
+      bandit:
+        enabled: true
+        config_file: "/security/bandit.yaml"
+        severity_level: "medium"
+        confidence_level: "medium"
+        
+      pip_audit:
+        enabled: true
+        fix: false
+        dry_run: false
+        
+    nodejs:
+      npm_audit:
+        enabled: true
+        audit_level: "moderate"
+        production_only: true
+        
+      yarn_audit:
+        enabled: true
+        level: "moderate"
+        
+      snyk_test:
+        enabled: false  # Requires license
+        
+  # Static Application Security Testing (SAST)
+  sast:
+    enabled: true
+    
+    codeql:
+      enabled: true
+      languages: ["python", "javascript", "typescript"]
+      queries: ["security-extended", "security-and-quality"]
+      
+    semgrep:
+      enabled: true
+      rules: ["auto", "security", "owasp-top-ten"]
+      config: "/security/semgrep.yaml"
+      
+    eslint_security:
+      enabled: true
+      config_file: "/security/.eslintrc-security.js"
+      
+  # Infrastructure security scanning
+  infrastructure_scanning:
+    enabled: true
+    
+    kubernetes:
+      kube_bench:
+        enabled: true
+        version: "cis-1.6"
+        master_nodes: true
+        worker_nodes: true
+        
+      kube_hunter:
+        enabled: true
+        remote: false
+        network_interface: "eth0"
+        
+      polaris:
+        enabled: true
+        config_file: "/security/polaris.yaml"
+        
+      falco:
+        enabled: true
+        config_file: "/security/falco.yaml"
+        
+    docker:
+      docker_bench:
+        enabled: true
+        config_file: "/security/docker-bench.sh"
+        
+    terraform:
+      tfsec:
+        enabled: true
+        config_file: "/security/tfsec.yaml"
+        
+      checkov:
+        enabled: true
+        framework: ["terraform", "kubernetes"]
+        
+  # Runtime security monitoring
+  runtime_security:
+    enabled: true
+    
+    falco:
+      enabled: true
+      rules_file: "/security/falco-rules.yaml"
+      priority: "warning"
+      buffer_size: 1024
+      
+    admission_controller:
+      enabled: true
+      webhook_url: "https://admission-controller.security.svc.cluster.local:443"
+      fail_policy: "Fail"
+      
+    opa_gatekeeper:
+      enabled: true
+      replicas: 3
+      audit_interval: 60
+      
+  # Compliance and reporting
+  compliance:
+    enabled: true
+    
+    frameworks:
+      cis:
+        enabled: true
+        version: "1.6.1"
+        benchmark: "kubernetes"
+        
+      nist:
+        enabled: true
+        framework: "800-53"
+        
+      soc2:
+        enabled: true
+        type: "type2"
+        
+    reporting:
+      formats: ["json", "html", "pdf"]
+      storage_path: "/security/reports"
+      retention_days: 365
+      
+  # Alerting and notifications
+  alerting:
+    enabled: true
+    
+    channels:
+      slack:
+        enabled: true
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#security-alerts"
+        
+      email:
+        enabled: true
+        smtp_server: "${SMTP_SERVER}"
+        recipients: ["security@company.com"]
+        
+      pagerduty:
+        enabled: false
+        integration_key: "${PAGERDUTY_KEY}"
+        
+    severity_mapping:
+      CRITICAL: ["slack", "email", "pagerduty"]
+      HIGH: ["slack", "email"]
+      MEDIUM: ["slack"]
+      LOW: ["email"]
+      
+  # Remediation
+  remediation:
+    auto_update:
+      enabled: false
+      severity_threshold: "CRITICAL"
+      environments: ["development"]
+      
+    quarantine:
+      enabled: true
+      severity_threshold: "HIGH"
+      action: "isolate"
+      
+# Environment-specific overrides
+environments:
+  development:
+    security:
+      global:
+        severity_threshold: "MEDIUM"
+        auto_remediation: true
+      container_scanning:
+        build_scanning:
+          fail_build_on: "CRITICAL"
+      runtime_security:
+        admission_controller:
+          fail_policy: "Warn"
+          
+  staging:
+    security:
+      global:
+        severity_threshold: "HIGH"
+      container_scanning:
+        build_scanning:
+          fail_build_on: "HIGH"
+          
+  production:
+    security:
+      global:
+        severity_threshold: "HIGH"
+        auto_remediation: false
+      container_scanning:
+        build_scanning:
+          fail_build_on: "HIGH"
+      runtime_security:
+        admission_controller:
+          fail_policy: "Fail"

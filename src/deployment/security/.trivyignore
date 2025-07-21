@@ -1,0 +1,27 @@
+# Trivy Ignore File for Voice Agents Platform
+# Add CVEs that are acceptable risks or false positives
+
+# Development and testing dependencies (low risk in production)
+# Uncomment and add specific CVEs as needed
+
+# Example ignores (remove as appropriate):
+# CVE-2019-12345  # Example: low severity issue in test dependency
+# CVE-2020-67890  # Example: false positive in specific context
+
+# Build tools and development dependencies
+# These are typically not present in production containers
+
+# Documentation and example code vulnerabilities
+# Often not exploitable in production context
+
+# Legacy dependencies with no viable alternatives
+# Document business justification for each
+
+# Note: Each ignore should have:
+# 1. CVE ID
+# 2. Reason for ignoring  
+# 3. Review date
+# 4. Approval from security team
+
+# Example format:
+# CVE-2023-12345  # Low risk - dev dependency only, reviewed 2024-01-15, approved by security team

@@ -10,8 +10,17 @@ from typing import Optional, Dict, Any, AsyncIterator, Union
 from enum import Enum
 import asyncio
 import logging
+import time
+from typing import AsyncIterator
 
-logger = logging.getLogger(__name__)
+from ...monitoring.structured_logging import (
+    StructuredLogger, 
+    timed_operation, 
+    CorrelationIdManager
+)
+from ...monitoring.logging_middleware import pipeline_tracker
+
+logger = StructuredLogger(__name__, "stt")
 
 
 class STTLanguage(Enum):
@@ -113,7 +122,8 @@ class BaseSTTProvider(ABC):
         self.config = config
         self._is_streaming = False
         self._stream_task = None
-        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = StructuredLogger(f"{__name__}.{self.__class__.__name__}", "stt")
+        self._current_pipeline_id = None
     
     @property
     @abstractmethod
@@ -155,6 +165,124 @@ class BaseSTTProvider(ABC):
             STTResult with transcription
         """
         pass
+    
+    async def transcribe_audio_with_logging(
+        self, 
+        audio_data: bytes,
+        pipeline_id: Optional[str] = None
+    ) -> STTResult:
+        """
+        Transcribe audio with structured logging and correlation tracking.
+        
+        Args:
+            audio_data: Raw audio bytes
+            pipeline_id: Optional pipeline ID for correlation
+            
+        Returns:
+            STTResult with transcription
+        """
+        start_time = time.time()
+        
+        # Set pipeline context if provided
+        if pipeline_id:
+            self._current_pipeline_id = pipeline_id
+            await pipeline_tracker.log_stage_start(
+                pipeline_id,
+                "stt",
+                self.provider_name,
+                {
+                    "audio_size_bytes": len(audio_data),
+                    "provider": self.provider_name,
+                    "language": self.config.language.value if hasattr(self.config, 'language') else None,
+                    "quality": self.config.quality.value if hasattr(self.config, 'quality') else None
+                }
+            )
+        
+        # Log operation start
+        self.logger.log_operation_start(
+            "transcribe_audio",
+            extra_data={
+                "audio_size_bytes": len(audio_data),
+                "provider": self.provider_name,
+                "pipeline_id": pipeline_id
+            }
+        )
+        
+        try:
+            # Perform transcription
+            result = await self.transcribe_audio(audio_data)
+            
+            duration = time.time() - start_time
+            
+            # Log successful completion
+            self.logger.log_operation_end(
+                "transcribe_audio",
+                duration,
+                True,
+                extra_data={
+                    "text_length": len(result.text),
+                    "confidence": result.confidence,
+                    "is_final": result.is_final,
+                    "language": result.language,
+                    "provider": self.provider_name,
+                    "pipeline_id": pipeline_id
+                }
+            )
+            
+            # Log performance metrics
+            self.logger.log_performance_metrics(
+                "transcribe_audio",
+                {
+                    "duration_ms": duration * 1000,
+                    "audio_size_bytes": len(audio_data),
+                    "text_length": len(result.text),
+                    "confidence": result.confidence,
+                    "provider": self.provider_name,
+                    "throughput_bytes_per_second": len(audio_data) / duration if duration > 0 else 0
+                }
+            )
+            
+            # Log pipeline stage completion
+            if pipeline_id:
+                await pipeline_tracker.log_stage_end(
+                    pipeline_id,
+                    "stt",
+                    True,
+                    {
+                        "text": result.text,
+                        "text_length": len(result.text),
+                        "confidence": result.confidence,
+                        "language": result.language
+                    }
+                )
+            
+            return result
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            
+            # Log error
+            self.logger.exception(
+                f"STT transcription failed: {e}",
+                extra_data={
+                    "provider": self.provider_name,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "audio_size_bytes": len(audio_data),
+                    "pipeline_id": pipeline_id
+                }
+            )
+            
+            # Log pipeline stage failure
+            if pipeline_id:
+                await pipeline_tracker.log_stage_end(
+                    pipeline_id,
+                    "stt",
+                    False,
+                    error=str(e)
+                )
+            
+            raise
     
     @abstractmethod
     async def start_streaming(self) -> None:

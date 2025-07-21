@@ -1,0 +1,518 @@
+# Service definitions for LiveKit Voice Agents Platform
+# Provides service discovery and load balancing for all components
+
+---
+# Voice Agent Service - Development
+apiVersion: v1
+kind: Service
+metadata:
+  name: voice-agent-service
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: development
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: development
+
+---
+# Voice Agent Service - Staging
+apiVersion: v1
+kind: Service
+metadata:
+  name: voice-agent-service
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: staging
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: staging
+
+---
+# Voice Agent Service - Production
+apiVersion: v1
+kind: Service
+metadata:
+  name: voice-agent-service
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+---
+# PostgreSQL Service - Development
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    environment: development
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: postgres
+    environment: development
+
+---
+# PostgreSQL Service - Staging
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    environment: staging
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: postgres
+    environment: staging
+
+---
+# PostgreSQL Service - Production
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    environment: production
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: postgres
+    environment: production
+
+---
+# Redis Service - Development
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: redis
+    environment: development
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: redis
+    environment: development
+
+---
+# Redis Service - Staging
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: redis
+    environment: staging
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: redis
+    environment: staging
+
+---
+# Redis Service - Production
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: redis
+    environment: production
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: redis
+    environment: production
+
+---
+# LiveKit Service - Development
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-service
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: livekit
+    environment: development
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 7880
+      targetPort: 7880
+      protocol: TCP
+    - name: rtc-tcp
+      port: 7881
+      targetPort: 7881
+      protocol: TCP
+    - name: rtc-udp
+      port: 7882
+      targetPort: 7882
+      protocol: UDP
+  selector:
+    app: voice-agents-platform
+    component: livekit
+    environment: development
+
+---
+# LiveKit Service - Staging
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-service
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: livekit
+    environment: staging
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 7880
+      targetPort: 7880
+      protocol: TCP
+    - name: rtc-tcp
+      port: 7881
+      targetPort: 7881
+      protocol: TCP
+    - name: rtc-udp
+      port: 7882
+      targetPort: 7882
+      protocol: UDP
+  selector:
+    app: voice-agents-platform
+    component: livekit
+    environment: staging
+
+---
+# LiveKit Service - Production
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-service
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: livekit
+    environment: production
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 7880
+      targetPort: 7880
+      protocol: TCP
+    - name: rtc-tcp
+      port: 7881
+      targetPort: 7881
+      protocol: TCP
+    - name: rtc-udp
+      port: 7882
+      targetPort: 7882
+      protocol: UDP
+  selector:
+    app: voice-agents-platform
+    component: livekit
+    environment: production
+
+---
+# LiveKit UDP Service for WebRTC - Production (NodePort for external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-udp-service
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: livekit
+    type: udp
+    environment: production
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "udp"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: rtc-udp-range-start
+      port: 50000
+      targetPort: 50000
+      protocol: UDP
+    - name: rtc-udp-range-end
+      port: 60000
+      targetPort: 60000
+      protocol: UDP
+  selector:
+    app: voice-agents-platform
+    component: livekit
+    environment: production
+
+---
+# NGINX Service - Development
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: nginx
+    environment: development
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: nginx
+    environment: development
+
+---
+# NGINX Service - Staging
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: nginx
+    environment: staging
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: nginx
+    environment: staging
+
+---
+# NGINX Service - Production
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: nginx
+    environment: production
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: nginx
+    environment: production
+
+---
+# Headless Service for Voice Agent Discovery - Production
+apiVersion: v1
+kind: Service
+metadata:
+  name: voice-agent-headless
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: headless
+    environment: production
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+
+---
+# External Service for Monitoring Access
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-external
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: monitoring
+    type: external
+spec:
+  type: LoadBalancer
+  ports:
+    - name: prometheus
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+    - name: grafana
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+    - name: jaeger
+      port: 16686
+      targetPort: 16686
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: monitoring

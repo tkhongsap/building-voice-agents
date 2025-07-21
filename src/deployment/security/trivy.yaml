@@ -1,0 +1,190 @@
+# Trivy Configuration for Voice Agents Platform
+# Container vulnerability scanning configuration
+
+# Database settings
+db:
+  repository: "ghcr.io/aquasecurity/trivy-db"
+  skip-update: false
+  download-db-only: false
+  reset: false
+
+# Cache settings
+cache:
+  backend: "fs"
+  dir: "/tmp/trivy-cache"
+  redis:
+    ca: ""
+    cert: ""
+    key: ""
+    ttl: 3600
+
+# Vulnerability scanning settings
+vulnerability:
+  # Vulnerability types to scan
+  type: 
+    - "os"
+    - "library"
+  
+  # Severity levels to report
+  severity:
+    - "UNKNOWN"
+    - "LOW" 
+    - "MEDIUM"
+    - "HIGH"
+    - "CRITICAL"
+  
+  # Vulnerability databases
+  sources:
+    - "nvd"
+    - "redhat"
+    - "debian"
+    - "ubuntu"
+    - "alpine"
+    - "amazon"
+    - "oracle"
+    - "photon"
+    - "suse"
+    - "mariner"
+    - "wolfi"
+    - "chainguard"
+    - "bitnami"
+    - "ghsa"
+    - "glad"
+    - "osv"
+  
+  # Skip specific vulnerabilities
+  ignore-unfixed: false
+  ignore-policy: "/security/trivy-ignore.rego"
+  
+  # VEX (Vulnerability Exploitability eXchange) support
+  vex: "/security/vex.json"
+
+# Secret scanning settings
+secret:
+  config: "/security/trivy-secret.yaml"
+  
+# Configuration scanning settings
+config:
+  # Policy files for misconfigurations
+  policy: "/security/trivy-policies"
+  data: "/security/trivy-data"
+  
+  # Namespaces for policies
+  policy-namespaces:
+    - "main"
+    - "kubernetes"
+    - "docker"
+    - "cloud"
+  
+  # Trace mode for debugging
+  trace: false
+  
+  # File patterns to include/exclude
+  file-patterns:
+    - "*.yaml"
+    - "*.yml" 
+    - "*.json"
+    - "*.tf"
+    - "*.dockerfile"
+    - "Dockerfile*"
+    - "*.toml"
+    - "*.properties"
+  
+  # Skip files
+  skip-files:
+    - "test/**"
+    - "tests/**"
+    - "**/*_test.go"
+    - "**/*_test.py"
+    - "**/node_modules/**"
+    - "**/vendor/**"
+
+# License scanning
+license:
+  full: false
+  ignored:
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-3-Clause"
+    - "BSD-2-Clause"
+    - "ISC"
+
+# Output settings
+format: "json"
+output: "/security/reports/trivy-report.json"
+exit-code: 0  # Don't fail CI by default, let security policies decide
+
+# Scanning settings
+timeout: "15m0s"
+quiet: false
+debug: false
+insecure: false
+offline-scan: false
+skip-db-update: false
+skip-java-db-update: false
+light: false
+
+# Registry settings  
+registry:
+  token: ""
+  username: ""
+  password: ""
+  
+# Custom headers
+custom-headers: {}
+
+# Server mode settings
+server:
+  listen: "localhost:4954"
+  cache-backend: "redis://localhost:6379"
+  token: ""
+  token-header: "Trivy-Token"
+
+# Repository settings
+repository:
+  branch: "main"
+  commit: ""
+  tag: ""
+
+# Include development dependencies
+include-dev-deps: false
+
+# Parallel processing
+parallel: 5
+
+# Compliance settings
+compliance: "docker-cis"
+
+# Dependency track integration
+dependency-tree: false
+
+# SBOM (Software Bill of Materials)
+sbom-sources:
+  - "rekor"
+
+# Custom CA certificate
+ca-cert: ""
+
+# Ignore files
+ignorefile: "/security/.trivyignore"
+
+# Helm chart scanning
+helm-api-versions:
+  - "v1"
+  - "apps/v1"
+  - "networking.k8s.io/v1"
+
+# Kubernetes scanning
+k8s-version: "1.21"
+
+# REGO policies for custom checks
+rego:
+  trace: false
+  strict: false
+  
+# Exit codes for different scenarios
+exit-codes:
+  vuln: 1
+  config: 2
+  license: 3
+  secret: 4

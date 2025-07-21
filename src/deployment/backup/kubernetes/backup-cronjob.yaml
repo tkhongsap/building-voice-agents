@@ -1,0 +1,380 @@
+# Kubernetes CronJob for automated backups
+# Runs backup tasks on schedule in production environments
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: backup
+    type: postgres
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: voice-agents-platform
+            component: backup
+            type: postgres
+        spec:
+          serviceAccountName: backup-service-account
+          containers:
+          - name: postgres-backup
+            image: voice-agents/backup-manager:latest
+            imagePullPolicy: Always
+            command:
+              - python
+              - /app/scripts/backup_manager.py
+              - --type
+              - postgres
+              - --once  # Run once and exit
+            env:
+              - name: POSTGRES_HOST
+                value: postgres-primary
+              - name: POSTGRES_PORT
+                value: "5432"
+              - name: POSTGRES_DB
+                value: voice_agents
+              - name: POSTGRES_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: postgres-credentials
+                    key: username
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: postgres-credentials
+                    key: password
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: access_key_id
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: secret_access_key
+              - name: AWS_DEFAULT_REGION
+                value: us-east-1
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "2000m"
+            volumeMounts:
+              - name: backup-config
+                mountPath: /app/backup_config.yaml
+                subPath: backup_config.yaml
+              - name: temp
+                mountPath: /tmp
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-config
+              configMap:
+                name: backup-config
+            - name: temp
+              emptyDir: {}
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-backup
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: backup
+    type: redis
+spec:
+  schedule: "0 */2 * * *"  # Every 2 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: voice-agents-platform
+            component: backup
+            type: redis
+        spec:
+          serviceAccountName: backup-service-account
+          containers:
+          - name: redis-backup
+            image: voice-agents/backup-manager:latest
+            imagePullPolicy: Always
+            command:
+              - python
+              - /app/scripts/backup_manager.py
+              - --type
+              - redis
+              - --once
+            env:
+              - name: REDIS_HOST
+                value: redis-master
+              - name: REDIS_PORT
+                value: "6379"
+              - name: REDIS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: redis-credentials
+                    key: password
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: access_key_id
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: secret_access_key
+              - name: AWS_DEFAULT_REGION
+                value: us-east-1
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "1000m"
+            volumeMounts:
+              - name: backup-config
+                mountPath: /app/backup_config.yaml
+                subPath: backup_config.yaml
+              - name: temp
+                mountPath: /tmp
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-config
+              configMap:
+                name: backup-config
+            - name: temp
+              emptyDir: {}
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: voice-data-backup
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: backup
+    type: voice-data
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: voice-agents-platform
+            component: backup
+            type: voice-data
+        spec:
+          serviceAccountName: backup-service-account
+          containers:
+          - name: voice-data-backup
+            image: voice-agents/backup-manager:latest
+            imagePullPolicy: Always
+            command:
+              - python
+              - /app/scripts/backup_manager.py
+              - --type
+              - voice_data
+              - --once
+            env:
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: access_key_id
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: secret_access_key
+              - name: AWS_DEFAULT_REGION
+                value: us-east-1
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "1000m"
+              limits:
+                memory: "4Gi"
+                cpu: "4000m"
+            volumeMounts:
+              - name: backup-config
+                mountPath: /app/backup_config.yaml
+                subPath: backup_config.yaml
+              - name: voice-data
+                mountPath: /data
+                readOnly: true
+              - name: temp
+                mountPath: /tmp
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-config
+              configMap:
+                name: backup-config
+            - name: voice-data
+              persistentVolumeClaim:
+                claimName: voice-agent-data-pvc
+            - name: temp
+              emptyDir: {}
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: restore-test
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: backup
+    type: restore-test
+spec:
+  schedule: "0 6 * * 0"  # Weekly on Sunday at 6 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: voice-agents-platform
+            component: backup
+            type: restore-test
+        spec:
+          serviceAccountName: backup-service-account
+          containers:
+          - name: restore-tester
+            image: voice-agents/backup-manager:latest
+            imagePullPolicy: Always
+            command:
+              - python
+              - /app/scripts/restore_tester.py
+            env:
+              - name: POSTGRES_HOST
+                value: postgres-test
+              - name: POSTGRES_PORT
+                value: "5432"
+              - name: POSTGRES_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: postgres-test-credentials
+                    key: username
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: postgres-test-credentials
+                    key: password
+              - name: REDIS_HOST
+                value: redis-test
+              - name: REDIS_PORT
+                value: "6379"
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: access_key_id
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backup-s3-credentials
+                    key: secret_access_key
+              - name: AWS_DEFAULT_REGION
+                value: us-east-1
+              - name: SLACK_WEBHOOK_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: notification-credentials
+                    key: slack_webhook_url
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "2000m"
+            volumeMounts:
+              - name: backup-config
+                mountPath: /app/backup_config.yaml
+                subPath: backup_config.yaml
+              - name: temp
+                mountPath: /tmp
+          restartPolicy: OnFailure
+          volumes:
+            - name: backup-config
+              configMap:
+                name: backup-config
+            - name: temp
+              emptyDir: {}
+
+---
+# ServiceAccount for backup operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backup-service-account
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: backup
+
+---
+# Role for backup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backup-role
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: backup
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["get", "list", "create"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+
+---
+# RoleBinding for backup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backup-rolebinding
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: backup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: backup-role
+subjects:
+  - kind: ServiceAccount
+    name: backup-service-account
+    namespace: voice-agents-prod

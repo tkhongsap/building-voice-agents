@@ -1,0 +1,762 @@
+# Monitoring and Observability configurations for LiveKit Voice Agents Platform
+# Prometheus, Grafana, Jaeger, and related monitoring infrastructure
+
+---
+# Prometheus Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: prometheus
+    environment: shared
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: voice-agents-platform
+      component: prometheus
+      environment: shared
+  template:
+    metadata:
+      labels:
+        app: voice-agents-platform
+        component: prometheus
+        environment: shared
+    spec:
+      serviceAccountName: monitoring-service-account
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          ports:
+            - containerPort: 9090
+              name: prometheus
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--web.console.templates=/etc/prometheus/consoles'
+            - '--storage.tsdb.retention.time=30d'
+            - '--web.enable-lifecycle'
+            - '--web.enable-admin-api'
+            - '--storage.tsdb.max-block-duration=2h'
+            - '--storage.tsdb.min-block-duration=2h'
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+            - name: prometheus-data
+              mountPath: /prometheus
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+        - name: prometheus-data
+          persistentVolumeClaim:
+            claimName: prometheus-data-pvc
+
+---
+# Prometheus Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'voice-agents-platform'
+        
+    rule_files:
+      - "voice-agents-rules.yml"
+      
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+    
+    scrape_configs:
+      # Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      # Kubernetes API server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+      
+      # Kubernetes nodes
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics
+      
+      # Voice Agent pods
+      - job_name: 'voice-agents-dev'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - voice-agents-dev
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+      
+      # Voice Agent pods - Staging
+      - job_name: 'voice-agents-staging'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - voice-agents-staging
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+      
+      # Voice Agent pods - Production
+      - job_name: 'voice-agents-prod'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - voice-agents-prod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+  
+  voice-agents-rules.yml: |
+    groups:
+      - name: voice-agents.rules
+        rules:
+          # High CPU usage
+          - alert: HighCPUUsage
+            expr: (rate(container_cpu_usage_seconds_total{container="voice-agent"}[5m]) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage detected"
+              description: "Voice agent {{ $labels.pod }} CPU usage is above 80%"
+          
+          # High memory usage
+          - alert: HighMemoryUsage
+            expr: (container_memory_usage_bytes{container="voice-agent"} / container_spec_memory_limit_bytes{container="voice-agent"} * 100) > 85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage detected"
+              description: "Voice agent {{ $labels.pod }} memory usage is above 85%"
+          
+          # Pod crash looping
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total{container="voice-agent"}[15m]) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod is crash looping"
+              description: "Voice agent {{ $labels.pod }} is crash looping"
+          
+          # Service down
+          - alert: ServiceDown
+            expr: up{job=~"voice-agents-.*"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service is down"
+              description: "Voice agent service {{ $labels.instance }} is down"
+          
+          # High error rate
+          - alert: HighErrorRate
+            expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is above 10% for {{ $labels.instance }}"
+
+---
+# Prometheus Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: prometheus
+    environment: shared
+spec:
+  type: ClusterIP
+  ports:
+    - name: prometheus
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: prometheus
+    environment: shared
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: grafana
+    environment: shared
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: voice-agents-platform
+      component: grafana
+      environment: shared
+  template:
+    metadata:
+      labels:
+        app: voice-agents-platform
+        component: grafana
+        environment: shared
+    spec:
+      serviceAccountName: monitoring-service-account
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+              name: grafana
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: monitoring-secrets
+                  key: GRAFANA_ADMIN_USER
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: monitoring-secrets
+                  key: GRAFANA_ADMIN_PASSWORD
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_INSTALL_PLUGINS
+              value: "grafana-piechart-panel,grafana-worldmap-panel"
+            - name: GF_PATHS_PROVISIONING
+              value: "/etc/grafana/provisioning"
+          volumeMounts:
+            - name: grafana-data
+              mountPath: /var/lib/grafana
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: grafana-data
+          persistentVolumeClaim:
+            claimName: grafana-data-pvc
+        - name: grafana-provisioning
+          configMap:
+            name: grafana-provisioning
+
+---
+# Grafana Provisioning ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provisioning
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: grafana
+data:
+  datasources.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-service:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: "5s"
+      - name: Jaeger
+        type: jaeger
+        access: proxy
+        url: http://jaeger-service:16686
+        editable: true
+  
+  dashboards.yml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /etc/grafana/provisioning/dashboards
+  
+  voice-agents-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Voice Agents Platform Overview",
+        "tags": ["voice-agents"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Active Voice Sessions",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(voice_sessions_active)",
+                "refId": "A"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "HTTP Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total[5m])",
+                "refId": "A"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Pod CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{container=\"voice-agent\"}[5m]) * 100",
+                "refId": "A"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Pod Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{container=\"voice-agent\"} / 1024 / 1024",
+                "refId": "A"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "5s"
+      }
+    }
+
+---
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: grafana
+    environment: shared
+spec:
+  type: ClusterIP
+  ports:
+    - name: grafana
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: grafana
+    environment: shared
+
+---
+# Jaeger All-in-One Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: jaeger
+    environment: shared
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: voice-agents-platform
+      component: jaeger
+      environment: shared
+  template:
+    metadata:
+      labels:
+        app: voice-agents-platform
+        component: jaeger
+        environment: shared
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:latest
+          ports:
+            - containerPort: 16686
+              name: ui
+            - containerPort: 14268
+              name: collector
+            - containerPort: 6831
+              name: agent-thrift
+              protocol: UDP
+            - containerPort: 6832
+              name: agent-binary
+              protocol: UDP
+            - containerPort: 5775
+              name: agent-zipkin
+              protocol: UDP
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            - name: COLLECTOR_ZIPKIN_HOST_PORT
+              value: "9411"
+          volumeMounts:
+            - name: jaeger-data
+              mountPath: /badger
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 16686
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 16686
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: jaeger-data
+          persistentVolumeClaim:
+            claimName: jaeger-data-pvc
+
+---
+# Jaeger Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-service
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: jaeger
+    environment: shared
+spec:
+  type: ClusterIP
+  ports:
+    - name: ui
+      port: 16686
+      targetPort: 16686
+      protocol: TCP
+    - name: collector
+      port: 14268
+      targetPort: 14268
+      protocol: TCP
+    - name: agent-thrift
+      port: 6831
+      targetPort: 6831
+      protocol: UDP
+    - name: agent-binary
+      port: 6832
+      targetPort: 6832
+      protocol: UDP
+    - name: agent-zipkin
+      port: 5775
+      targetPort: 5775
+      protocol: UDP
+  selector:
+    app: voice-agents-platform
+    component: jaeger
+    environment: shared
+
+---
+# ServiceMonitor for Prometheus Operator (if using)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: voice-agents-monitor
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: voice-agents-platform
+  namespaceSelector:
+    matchNames:
+      - voice-agents-dev
+      - voice-agents-staging
+      - voice-agents-prod
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+
+---
+# AlertManager Deployment (optional)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: alertmanager
+    environment: shared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voice-agents-platform
+      component: alertmanager
+      environment: shared
+  template:
+    metadata:
+      labels:
+        app: voice-agents-platform
+        component: alertmanager
+        environment: shared
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:latest
+          ports:
+            - containerPort: 9093
+              name: alertmanager
+          args:
+            - '--config.file=/etc/alertmanager/alertmanager.yml'
+            - '--storage.path=/alertmanager'
+            - '--web.external-url=http://alertmanager:9093'
+          volumeMounts:
+            - name: alertmanager-config
+              mountPath: /etc/alertmanager
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      volumes:
+        - name: alertmanager-config
+          configMap:
+            name: alertmanager-config
+
+---
+# AlertManager Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alerts@voice-agents.example.com'
+    
+    route:
+      group_by: ['alertname']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+    
+    receivers:
+      - name: 'web.hook'
+        email_configs:
+          - to: 'admin@voice-agents.example.com'
+            subject: 'Voice Agents Alert: {{ .GroupLabels.alertname }}'
+            body: |
+              {{ range .Alerts }}
+              Alert: {{ .Annotations.summary }}
+              Description: {{ .Annotations.description }}
+              {{ end }}
+
+---
+# AlertManager Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-service
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: alertmanager
+    environment: shared
+spec:
+  type: ClusterIP
+  ports:
+    - name: alertmanager
+      port: 9093
+      targetPort: 9093
+      protocol: TCP
+  selector:
+    app: voice-agents-platform
+    component: alertmanager
+    environment: shared

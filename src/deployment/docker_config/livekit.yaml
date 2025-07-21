@@ -1,0 +1,71 @@
+# LiveKit Server Configuration for Voice Agents Platform
+# Optimized for development and testing
+
+port: 7880
+bind_addresses:
+  - ""
+
+# API configuration
+keys:
+  devkey: devsecret
+
+# Redis configuration for distributed setup
+redis:
+  address: redis:6379
+  db: 0
+
+# Room configuration
+room:
+  enabled_codecs:
+    - mime: audio/opus
+    - mime: audio/pcm
+  max_participants: 100
+  empty_timeout: 300s
+  departure_timeout: 20s
+
+# RTC configuration optimized for voice
+rtc:
+  # ICE configuration
+  ice_servers:
+    - urls:
+        - stun:stun.l.google.com:19302
+  
+  # UDP port range for media
+  port_range_start: 50000
+  port_range_end: 60000
+  
+  # Use mDNS for local development
+  use_external_ip: false
+  
+  # TCP fallback
+  tcp_port: 7881
+
+# WebRTC configuration
+webrtc:
+  # Congestion control
+  congestion_control: bbr
+  
+  # Audio settings optimized for voice
+  audio:
+    # Opus configuration
+    opus:
+      max_bitrate: 128000
+      min_bitrate: 16000
+      
+  # Network settings
+  network:
+    # Adaptive bitrate
+    enable_abr: true
+    
+    # Packet loss detection
+    enable_red: true
+
+# Logging configuration
+logging:
+  level: debug
+  json: true
+  
+# Development settings
+development:
+  # Allow insecure connections for local dev
+  disable_strict_transport_security: true
