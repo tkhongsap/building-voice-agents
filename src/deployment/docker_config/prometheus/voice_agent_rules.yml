@@ -1,0 +1,213 @@
+# Voice Agent Specific Alerting Rules
+# Production-ready alerts for LiveKit Voice Agents Platform
+
+groups:
+  - name: voice_agent_critical_alerts
+    interval: 30s
+    rules:
+      # Critical: Voice Agent Service Down
+      - alert: VoiceAgentServiceDown
+        expr: up{job=~"voice-agent.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/service-down"
+        annotations:
+          summary: "Voice Agent service {{ $labels.instance }} is down"
+          description: "Voice Agent service on {{ $labels.instance }} has been down for more than 1 minute"
+          impact: "New voice sessions cannot be created, existing sessions may be affected"
+
+      # Critical: High Error Rate
+      - alert: VoiceAgentHighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{job=~"voice-agent.*",status=~"5.."}[5m]) / 
+            rate(http_requests_total{job=~"voice-agent.*"}[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-error-rate"
+        annotations:
+          summary: "High error rate detected for Voice Agent"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.instance }} over the last 5 minutes"
+          impact: "Users experiencing failures in voice sessions"
+
+      # Critical: Memory Usage Too High
+      - alert: VoiceAgentHighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{container=~"voice-agent.*"} / 
+            container_spec_memory_limit_bytes{container=~"voice-agent.*"}
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: critical
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-memory"
+        annotations:
+          summary: "Voice Agent memory usage is critically high"
+          description: "Memory usage is {{ $value | humanizePercentage }} for {{ $labels.pod }}"
+          impact: "Risk of OOM kills and service disruption"
+
+      # Critical: Audio Processing Latency Too High
+      - alert: VoiceAgentHighAudioLatency
+        expr: |
+          histogram_quantile(0.95, 
+            rate(audio_processing_duration_seconds_bucket[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          component: audio-processing
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-latency"
+        annotations:
+          summary: "Audio processing latency is too high"
+          description: "95th percentile audio processing latency is {{ $value }}s"
+          impact: "Poor user experience due to delayed audio responses"
+
+  - name: voice_agent_warning_alerts
+    interval: 60s
+    rules:
+      # Warning: High CPU Usage
+      - alert: VoiceAgentHighCPUUsage
+        expr: |
+          rate(container_cpu_usage_seconds_total{container=~"voice-agent.*"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-cpu"
+        annotations:
+          summary: "Voice Agent CPU usage is high"
+          description: "CPU usage is {{ $value }}% for {{ $labels.pod }}"
+          impact: "Performance degradation possible"
+
+      # Warning: Pod Restart Rate
+      - alert: VoiceAgentHighRestartRate
+        expr: |
+          rate(kube_pod_container_status_restarts_total{container=~"voice-agent.*"}[1h]) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/restart-rate"
+        annotations:
+          summary: "Voice Agent pod restart rate is high"
+          description: "Pod {{ $labels.pod }} is restarting {{ $value }} times per hour"
+          impact: "Potential instability in voice agent service"
+
+      # Warning: Queue Depth Too High
+      - alert: VoiceAgentHighQueueDepth
+        expr: worker_orchestrator_queued_jobs > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: worker-orchestrator
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/queue-depth"
+        annotations:
+          summary: "Voice Agent job queue depth is high"
+          description: "{{ $value }} jobs are queued for processing"
+          impact: "Increased wait times for voice session initialization"
+
+      # Warning: WebRTC Connection Issues
+      - alert: VoiceAgentWebRTCConnectionIssues
+        expr: |
+          rate(webrtc_connection_failed_total[5m]) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: webrtc
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/webrtc-issues"
+        annotations:
+          summary: "High WebRTC connection failure rate"
+          description: "WebRTC connection failure rate is {{ $value }} failures/sec"
+          impact: "Users unable to establish voice connections"
+
+  - name: voice_agent_performance_alerts
+    interval: 120s
+    rules:
+      # Performance: Slow Response Time
+      - alert: VoiceAgentSlowResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket{job=~"voice-agent.*"}[10m])
+          ) > 2.0
+        for: 10m
+        labels:
+          severity: warning
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/slow-response"
+        annotations:
+          summary: "Voice Agent API response time is slow"
+          description: "95th percentile response time is {{ $value }}s"
+          impact: "Degraded user experience"
+
+      # Performance: Low Worker Utilization
+      - alert: VoiceAgentLowWorkerUtilization
+        expr: |
+          (
+            worker_orchestrator_active_workers / 
+            worker_orchestrator_total_workers
+          ) < 0.3
+        for: 30m
+        labels:
+          severity: info
+          component: worker-orchestrator
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/low-utilization"
+        annotations:
+          summary: "Low worker utilization detected"
+          description: "Worker utilization is {{ $value | humanizePercentage }}"
+          impact: "Potential resource waste, consider scaling down"
+
+      # Performance: High Concurrent Sessions
+      - alert: VoiceAgentHighConcurrentSessions
+        expr: voice_sessions_active > 100
+        for: 5m
+        labels:
+          severity: info
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/high-sessions"
+        annotations:
+          summary: "High number of concurrent voice sessions"
+          description: "{{ $value }} active voice sessions"
+          impact: "Monitor for resource constraints"
+
+  - name: voice_agent_business_metrics
+    interval: 300s
+    rules:
+      # Business: Session Success Rate
+      - alert: VoiceAgentLowSessionSuccessRate
+        expr: |
+          (
+            rate(voice_sessions_completed_total[1h]) / 
+            rate(voice_sessions_started_total[1h])
+          ) < 0.95
+        for: 15m
+        labels:
+          severity: warning
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/session-success"
+        annotations:
+          summary: "Voice session success rate is low"
+          description: "Session success rate is {{ $value | humanizePercentage }}"
+          impact: "Poor user experience, investigate session failures"
+
+      # Business: Average Session Duration Anomaly
+      - alert: VoiceAgentAbnormalSessionDuration
+        expr: |
+          abs(
+            avg_over_time(voice_session_duration_seconds[1h]) - 
+            avg_over_time(voice_session_duration_seconds[24h] offset 24h)
+          ) > 30
+        for: 30m
+        labels:
+          severity: info
+          component: voice-agent
+          runbook_url: "https://docs.voice-agents.example.com/runbooks/session-duration"
+        annotations:
+          summary: "Abnormal voice session duration detected"
+          description: "Average session duration changed by {{ $value }}s compared to yesterday"
+          impact: "Investigate changes in user behavior or system performance"

@@ -1,0 +1,289 @@
+# Recording Rules for Voice Agent Metrics
+# Pre-computed metrics for common queries and dashboard performance
+
+groups:
+  - name: voice_agent_recording_rules
+    interval: 30s
+    rules:
+      # HTTP Request Metrics
+      - record: voice_agent:http_request_rate
+        expr: |
+          sum(rate(http_requests_total{job=~"voice-agent.*"}[5m])) by (job, instance, method, status)
+
+      - record: voice_agent:http_error_rate
+        expr: |
+          sum(rate(http_requests_total{job=~"voice-agent.*",status=~"5.."}[5m])) by (job, instance) /
+          sum(rate(http_requests_total{job=~"voice-agent.*"}[5m])) by (job, instance)
+
+      - record: voice_agent:http_success_rate
+        expr: |
+          sum(rate(http_requests_total{job=~"voice-agent.*",status=~"2.."}[5m])) by (job, instance) /
+          sum(rate(http_requests_total{job=~"voice-agent.*"}[5m])) by (job, instance)
+
+      # Response Time Percentiles
+      - record: voice_agent:http_request_duration_p50
+        expr: |
+          histogram_quantile(0.50, 
+            sum(rate(http_request_duration_seconds_bucket{job=~"voice-agent.*"}[5m])) by (job, instance, le)
+          )
+
+      - record: voice_agent:http_request_duration_p90
+        expr: |
+          histogram_quantile(0.90, 
+            sum(rate(http_request_duration_seconds_bucket{job=~"voice-agent.*"}[5m])) by (job, instance, le)
+          )
+
+      - record: voice_agent:http_request_duration_p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket{job=~"voice-agent.*"}[5m])) by (job, instance, le)
+          )
+
+      - record: voice_agent:http_request_duration_p99
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(http_request_duration_seconds_bucket{job=~"voice-agent.*"}[5m])) by (job, instance, le)
+          )
+
+  - name: voice_session_recording_rules
+    interval: 30s
+    rules:
+      # Voice Session Metrics
+      - record: voice_agent:sessions_active_total
+        expr: sum(voice_sessions_active) by (instance, service)
+
+      - record: voice_agent:sessions_started_rate
+        expr: sum(rate(voice_sessions_started_total[5m])) by (instance, service)
+
+      - record: voice_agent:sessions_completed_rate
+        expr: sum(rate(voice_sessions_completed_total[5m])) by (instance, service)
+
+      - record: voice_agent:sessions_failed_rate
+        expr: sum(rate(voice_sessions_failed_total[5m])) by (instance, service)
+
+      - record: voice_agent:session_success_rate
+        expr: |
+          sum(rate(voice_sessions_completed_total[5m])) by (instance, service) /
+          sum(rate(voice_sessions_started_total[5m])) by (instance, service)
+
+      - record: voice_agent:session_duration_p50
+        expr: |
+          histogram_quantile(0.50, 
+            sum(rate(voice_session_duration_seconds_bucket[5m])) by (instance, service, le)
+          )
+
+      - record: voice_agent:session_duration_p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(voice_session_duration_seconds_bucket[5m])) by (instance, service, le)
+          )
+
+  - name: audio_processing_recording_rules
+    interval: 15s
+    rules:
+      # Audio Processing Latency
+      - record: voice_agent:audio_processing_latency_p50
+        expr: |
+          histogram_quantile(0.50, 
+            sum(rate(audio_processing_duration_seconds_bucket[5m])) by (instance, pipeline_stage, le)
+          )
+
+      - record: voice_agent:audio_processing_latency_p90
+        expr: |
+          histogram_quantile(0.90, 
+            sum(rate(audio_processing_duration_seconds_bucket[5m])) by (instance, pipeline_stage, le)
+          )
+
+      - record: voice_agent:audio_processing_latency_p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(audio_processing_duration_seconds_bucket[5m])) by (instance, pipeline_stage, le)
+          )
+
+      - record: voice_agent:audio_processing_latency_p99
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(audio_processing_duration_seconds_bucket[5m])) by (instance, pipeline_stage, le)
+          )
+
+      # Audio Quality Metrics
+      - record: voice_agent:audio_quality_score_avg
+        expr: avg(audio_quality_score) by (instance, session_id)
+
+      - record: voice_agent:audio_errors_rate
+        expr: sum(rate(audio_processing_errors_total[5m])) by (instance, error_type)
+
+      # Speech Recognition Metrics
+      - record: voice_agent:speech_recognition_latency_p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(speech_recognition_duration_seconds_bucket[5m])) by (instance, model, le)
+          )
+
+      - record: voice_agent:speech_recognition_accuracy
+        expr: |
+          sum(rate(speech_recognition_success_total[5m])) by (instance, model) /
+          sum(rate(speech_recognition_attempts_total[5m])) by (instance, model)
+
+  - name: worker_orchestration_recording_rules
+    interval: 30s
+    rules:
+      # Worker Pool Metrics
+      - record: voice_agent:workers_active_total
+        expr: sum(worker_orchestrator_active_workers) by (instance, worker_type)
+
+      - record: voice_agent:workers_idle_total
+        expr: sum(worker_orchestrator_idle_workers) by (instance, worker_type)
+
+      - record: voice_agent:workers_busy_total
+        expr: sum(worker_orchestrator_busy_workers) by (instance, worker_type)
+
+      - record: voice_agent:worker_utilization
+        expr: |
+          sum(worker_orchestrator_busy_workers) by (instance, worker_type) /
+          sum(worker_orchestrator_active_workers) by (instance, worker_type)
+
+      # Job Queue Metrics
+      - record: voice_agent:jobs_queued_total
+        expr: sum(worker_orchestrator_queued_jobs) by (instance, job_type, priority)
+
+      - record: voice_agent:jobs_processing_total
+        expr: sum(worker_orchestrator_processing_jobs) by (instance, job_type)
+
+      - record: voice_agent:job_processing_rate
+        expr: sum(rate(worker_orchestrator_jobs_completed_total[5m])) by (instance, job_type)
+
+      - record: voice_agent:job_success_rate
+        expr: |
+          sum(rate(worker_orchestrator_jobs_completed_total[5m])) by (instance, job_type) /
+          sum(rate(worker_orchestrator_jobs_started_total[5m])) by (instance, job_type)
+
+      # Job Latency Metrics
+      - record: voice_agent:job_queue_wait_time_p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(worker_orchestrator_job_queue_duration_seconds_bucket[5m])) by (instance, job_type, le)
+          )
+
+      - record: voice_agent:job_processing_time_p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(worker_orchestrator_job_processing_duration_seconds_bucket[5m])) by (instance, job_type, le)
+          )
+
+  - name: livekit_recording_rules
+    interval: 30s
+    rules:
+      # LiveKit Room Metrics
+      - record: livekit:rooms_active_total
+        expr: sum(livekit_rooms_active) by (instance)
+
+      - record: livekit:participants_active_total
+        expr: sum(livekit_participants_active) by (instance)
+
+      - record: livekit:room_creation_rate
+        expr: sum(rate(livekit_room_created_total[5m])) by (instance)
+
+      - record: livekit:room_creation_success_rate
+        expr: |
+          sum(rate(livekit_room_created_total[5m])) by (instance) /
+          sum(rate(livekit_room_creation_attempts_total[5m])) by (instance)
+
+      # WebRTC Connection Metrics
+      - record: livekit:webrtc_connections_active
+        expr: sum(livekit_webrtc_connections_active) by (instance)
+
+      - record: livekit:webrtc_connection_success_rate
+        expr: |
+          sum(rate(livekit_webrtc_connection_established_total[5m])) by (instance) /
+          sum(rate(livekit_webrtc_connection_attempts_total[5m])) by (instance)
+
+      - record: livekit:webrtc_rtt_p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(livekit_webrtc_rtt_seconds_bucket[5m])) by (instance, le)
+          )
+
+      # Audio/Video Quality Metrics
+      - record: livekit:packet_loss_rate
+        expr: |
+          sum(rate(livekit_webrtc_packets_lost_total[5m])) by (instance) /
+          sum(rate(livekit_webrtc_packets_sent_total[5m])) by (instance)
+
+      - record: livekit:audio_quality_avg
+        expr: avg(livekit_audio_quality_score) by (instance)
+
+      - record: livekit:bandwidth_utilization
+        expr: |
+          sum(rate(livekit_webrtc_bytes_sent_total[5m])) by (instance) +
+          sum(rate(livekit_webrtc_bytes_received_total[5m])) by (instance)
+
+  - name: infrastructure_recording_rules
+    interval: 60s
+    rules:
+      # CPU Utilization
+      - record: node:cpu_utilization
+        expr: |
+          100 - (
+            avg by (instance) (
+              rate(node_cpu_seconds_total{mode="idle"}[5m])
+            ) * 100
+          )
+
+      # Memory Utilization
+      - record: node:memory_utilization
+        expr: |
+          (
+            1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+          ) * 100
+
+      # Disk Utilization
+      - record: node:disk_utilization
+        expr: |
+          (
+            1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})
+          ) * 100
+
+      # Network Traffic
+      - record: node:network_traffic_rate
+        expr: |
+          sum(rate(node_network_receive_bytes_total{device!="lo"}[5m])) by (instance) +
+          sum(rate(node_network_transmit_bytes_total{device!="lo"}[5m])) by (instance)
+
+      # Load Average
+      - record: node:load_average_normalized
+        expr: |
+          node_load15 / count by (instance) (node_cpu_seconds_total{mode="idle"})
+
+  - name: business_metrics_recording_rules
+    interval: 300s
+    rules:
+      # Business KPIs (calculated over longer intervals)
+      - record: voice_agent:daily_active_sessions
+        expr: |
+          sum(increase(voice_sessions_started_total[24h])) by (service)
+
+      - record: voice_agent:average_session_duration_daily
+        expr: |
+          sum(increase(voice_session_duration_seconds_sum[24h])) by (service) /
+          sum(increase(voice_session_duration_seconds_count[24h])) by (service)
+
+      - record: voice_agent:session_success_rate_daily
+        expr: |
+          sum(increase(voice_sessions_completed_total[24h])) by (service) /
+          sum(increase(voice_sessions_started_total[24h])) by (service)
+
+      - record: voice_agent:cost_per_session
+        expr: |
+          (
+            sum(rate(container_cpu_usage_seconds_total{container=~"voice-agent.*"}[1h])) * 0.001 +
+            sum(container_memory_usage_bytes{container=~"voice-agent.*"}) / 1024 / 1024 / 1024 * 0.0001
+          ) / sum(rate(voice_sessions_started_total[1h]))
+
+      - record: voice_agent:resource_efficiency
+        expr: |
+          sum(rate(voice_sessions_completed_total[1h])) /
+          (
+            sum(rate(container_cpu_usage_seconds_total{container=~"voice-agent.*"}[1h])) +
+            sum(container_memory_usage_bytes{container=~"voice-agent.*"}) / 1024 / 1024 / 1024
+          )

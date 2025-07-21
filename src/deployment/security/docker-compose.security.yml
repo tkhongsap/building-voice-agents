@@ -1,0 +1,354 @@
+# Security Scanning Docker Compose for Voice Agents Platform
+# Comprehensive security and vulnerability scanning services
+
+version: '3.8'
+
+services:
+  # Trivy vulnerability scanner
+  trivy-scanner:
+    image: aquasec/trivy:latest
+    container_name: security-trivy-scanner
+    volumes:
+      - ./:/workspace:ro
+      - ./security:/security:ro
+      - trivy-cache:/tmp/trivy-cache
+      - trivy-db:/root/.cache/trivy
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - security-reports:/security/reports
+    environment:
+      - TRIVY_CONFIG_FILE=/security/trivy.yaml
+      - TRIVY_CACHE_DIR=/tmp/trivy-cache
+      - TRIVY_DB_REPOSITORY=ghcr.io/aquasecurity/trivy-db
+    command: 
+      - --config-file=/security/trivy.yaml
+      - --cache-dir=/tmp/trivy-cache
+    networks:
+      - security-network
+    restart: "no"
+    
+  # Trivy server mode for continuous scanning
+  trivy-server:
+    image: aquasec/trivy:latest
+    container_name: security-trivy-server
+    ports:
+      - "4954:4954"
+    volumes:
+      - trivy-cache:/tmp/trivy-cache
+      - trivy-db:/root/.cache/trivy
+      - ./security:/security:ro
+    environment:
+      - TRIVY_CACHE_DIR=/tmp/trivy-cache
+      - TRIVY_LISTEN=0.0.0.0:4954
+      - TRIVY_TOKEN=${TRIVY_SERVER_TOKEN:-default-token}
+    command:
+      - server
+      - --listen=0.0.0.0:4954
+      - --cache-dir=/tmp/trivy-cache
+      - --token=${TRIVY_SERVER_TOKEN:-default-token}
+    networks:
+      - security-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4954/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+  # Grype vulnerability scanner (alternative)
+  grype-scanner:
+    image: anchore/grype:latest
+    container_name: security-grype-scanner
+    volumes:
+      - ./:/workspace:ro
+      - grype-db:/root/.cache/grype
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - security-reports:/reports
+    environment:
+      - GRYPE_DB_CACHE_DIR=/root/.cache/grype
+      - GRYPE_REGISTRY_AUTH_AUTHORITY=docker.io
+    networks:
+      - security-network
+    restart: "no"
+    
+  # Syft for SBOM generation
+  syft-scanner:
+    image: anchore/syft:latest
+    container_name: security-syft-scanner
+    volumes:
+      - ./:/workspace:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - security-reports:/reports
+    networks:
+      - security-network
+    restart: "no"
+    
+  # Docker Bench Security
+  docker-bench:
+    image: docker/docker-bench-security:latest
+    container_name: security-docker-bench
+    volumes:
+      - /var/lib:/var/lib:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc:/etc:ro
+      - /usr/bin/containerd:/usr/bin/containerd:ro
+      - /usr/bin/runc:/usr/bin/runc:ro
+      - security-reports:/reports
+    networks:
+      - security-network
+    restart: "no"
+    
+  # Falco for runtime security monitoring
+  falco:
+    image: falcosecurity/falco:latest
+    container_name: security-falco
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock:ro
+      - /dev:/host/dev:ro
+      - /proc:/host/proc:ro
+      - /boot:/host/boot:ro
+      - /lib/modules:/host/lib/modules:ro
+      - /usr:/host/usr:ro
+      - /etc:/host/etc:ro
+      - ./security/falco.yaml:/etc/falco/falco.yaml:ro
+      - ./security/falco-rules.yaml:/etc/falco/rules.d/custom-rules.yaml:ro
+      - security-logs:/var/log/falco
+    environment:
+      - FALCO_CONFIG_FILE=/etc/falco/falco.yaml
+    networks:
+      - security-network
+    restart: unless-stopped
+    
+  # Notary for image signing verification
+  notary-server:
+    image: notary:server-0.7.0
+    container_name: security-notary-server
+    ports:
+      - "4443:4443"
+    volumes:
+      - notary-data:/var/lib/notary
+      - ./security/notary:/etc/notary:ro
+    environment:
+      - NOTARY_SERVER_CONFIG_FILE=/etc/notary/server-config.json
+    networks:
+      - security-network
+    restart: unless-stopped
+    depends_on:
+      - notary-db
+      
+  # Notary database
+  notary-db:
+    image: mysql:8.0
+    container_name: security-notary-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NOTARY_DB_PASSWORD:-notary_root_pass}
+      - MYSQL_DATABASE=notaryserver
+      - MYSQL_USER=notary
+      - MYSQL_PASSWORD=${NOTARY_DB_PASSWORD:-notary_pass}
+    volumes:
+      - notary-db-data:/var/lib/mysql
+    networks:
+      - security-network
+    restart: unless-stopped
+    
+  # Clair vulnerability database
+  clair:
+    image: quay.io/coreos/clair:latest
+    container_name: security-clair
+    ports:
+      - "6060:6060"
+      - "6061:6061"
+    volumes:
+      - ./security/clair.yaml:/etc/clair/config.yaml:ro
+      - clair-data:/var/lib/clair
+    environment:
+      - CLAIR_CONFIG_FILE=/etc/clair/config.yaml
+    networks:
+      - security-network
+    restart: unless-stopped
+    depends_on:
+      - clair-db
+      
+  # Clair database
+  clair-db:
+    image: postgres:13-alpine
+    container_name: security-clair-db
+    environment:
+      - POSTGRES_DB=clair
+      - POSTGRES_USER=clair
+      - POSTGRES_PASSWORD=${CLAIR_DB_PASSWORD:-clair_pass}
+    volumes:
+      - clair-db-data:/var/lib/postgresql/data
+    networks:
+      - security-network
+    restart: unless-stopped
+    
+  # Harbor registry with security scanning
+  harbor-registry:
+    image: goharbor/harbor-core:latest
+    container_name: security-harbor-registry
+    ports:
+      - "5000:5000"
+    volumes:
+      - harbor-data:/data
+      - ./security/harbor.yaml:/etc/harbor/harbor.yaml:ro
+    environment:
+      - HARBOR_CONFIG_FILE=/etc/harbor/harbor.yaml
+    networks:
+      - security-network
+    restart: unless-stopped
+    depends_on:
+      - harbor-db
+      - redis
+      
+  # Harbor database
+  harbor-db:
+    image: postgres:13-alpine
+    container_name: security-harbor-db
+    environment:
+      - POSTGRES_DB=harbor
+      - POSTGRES_USER=harbor
+      - POSTGRES_PASSWORD=${HARBOR_DB_PASSWORD:-harbor_pass}
+    volumes:
+      - harbor-db-data:/var/lib/postgresql/data
+    networks:
+      - security-network
+    restart: unless-stopped
+    
+  # Redis for Harbor
+  redis:
+    image: redis:7-alpine
+    container_name: security-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_pass}
+    volumes:
+      - redis-data:/data
+    networks:
+      - security-network
+    restart: unless-stopped
+    
+  # Vulnerability scanner scheduler
+  scanner-scheduler:
+    build:
+      context: .
+      dockerfile: security/Dockerfile.scheduler
+    container_name: security-scanner-scheduler
+    volumes:
+      - ./security:/security:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - security-reports:/reports
+      - security-logs:/logs
+    environment:
+      - SCHEDULER_CONFIG_FILE=/security/scheduler.yaml
+      - TRIVY_SERVER_URL=http://trivy-server:4954
+      - CLAIR_SERVER_URL=http://clair:6060
+    networks:
+      - security-network
+    restart: unless-stopped
+    depends_on:
+      - trivy-server
+      - clair
+      
+  # Security reporting service
+  security-reporter:
+    build:
+      context: .
+      dockerfile: security/Dockerfile.reporter
+    container_name: security-reporter
+    ports:
+      - "8090:8090"
+    volumes:
+      - security-reports:/reports:ro
+      - ./security:/security:ro
+    environment:
+      - REPORTER_CONFIG_FILE=/security/reporter.yaml
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+    networks:
+      - security-network
+    restart: unless-stopped
+    
+  # Prometheus for security metrics
+  prometheus-security:
+    image: prom/prometheus:latest
+    container_name: security-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./security/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./security/rules:/etc/prometheus/rules:ro
+      - prometheus-security-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - security-network
+    restart: unless-stopped
+    
+  # Grafana for security dashboards
+  grafana-security:
+    image: grafana/grafana:latest
+    container_name: security-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-security-data:/var/lib/grafana
+      - ./security/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./security/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    networks:
+      - security-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus-security
+
+# Named volumes for data persistence
+volumes:
+  trivy-cache:
+    driver: local
+  trivy-db:
+    driver: local
+  grype-db:
+    driver: local
+  security-reports:
+    driver: local
+  security-logs:
+    driver: local
+  notary-data:
+    driver: local
+  notary-db-data:
+    driver: local
+  clair-data:
+    driver: local
+  clair-db-data:
+    driver: local
+  harbor-data:
+    driver: local
+  harbor-db-data:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-security-data:
+    driver: local
+  grafana-security-data:
+    driver: local
+
+# Security scanning network
+networks:
+  security-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: security-br
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1

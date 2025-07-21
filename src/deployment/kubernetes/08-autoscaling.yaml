@@ -1,0 +1,493 @@
+# Auto-scaling configurations for LiveKit Voice Agents Platform
+# HorizontalPodAutoscaler and VerticalPodAutoscaler for dynamic scaling
+
+---
+# HorizontalPodAutoscaler for Voice Agent - Development
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: voice-agent-hpa
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: hpa
+    environment: development
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: voice-agent
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    # CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Max
+
+---
+# HorizontalPodAutoscaler for Voice Agent - Staging
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: voice-agent-hpa
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: hpa
+    environment: staging
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: voice-agent
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    # CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    # Memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+    # Custom metrics (requests per second)
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 3
+          periodSeconds: 60
+      selectPolicy: Max
+
+---
+# HorizontalPodAutoscaler for Voice Agent - Production
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: voice-agent-hpa
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: hpa
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: voice-agent
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    # CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    # Memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Custom metrics - HTTP requests per second
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "200"
+    # Custom metrics - WebSocket connections
+    - type: Pods
+      pods:
+        metric:
+          name: websocket_connections
+        target:
+          type: AverageValue
+          averageValue: "50"
+    # Custom metrics - Active voice sessions
+    - type: Pods
+      pods:
+        metric:
+          name: active_voice_sessions
+        target:
+          type: AverageValue
+          averageValue: "20"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 minutes for production stability
+      policies:
+        - type: Percent
+          value: 20
+          periodSeconds: 120
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 120  # 2 minutes
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 3
+          periodSeconds: 60
+      selectPolicy: Max
+
+---
+# HorizontalPodAutoscaler for LiveKit - Production
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: livekit-hpa
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: livekit
+    type: hpa
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: livekit
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    # CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+    # Custom metrics - Active rooms
+    - type: Pods
+      pods:
+        metric:
+          name: livekit_active_rooms
+        target:
+          type: AverageValue
+          averageValue: "10"
+    # Custom metrics - Participants
+    - type: Pods
+      pods:
+        metric:
+          name: livekit_participants
+        target:
+          type: AverageValue
+          averageValue: "50"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 180
+        - type: Pods
+          value: 1
+          periodSeconds: 180
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 120
+        - type: Pods
+          value: 2
+          periodSeconds: 120
+      selectPolicy: Max
+
+---
+# VerticalPodAutoscaler for Voice Agent - Production (requires VPA to be installed)
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: voice-agent-vpa
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: vpa
+    environment: production
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: voice-agent
+  updatePolicy:
+    updateMode: "Auto"  # Can be "Off", "Initial", or "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: voice-agent
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: 8000m
+          memory: 16Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+
+---
+# VerticalPodAutoscaler for PostgreSQL - Production
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: postgres-vpa
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    type: vpa
+    environment: production
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: postgres
+  updatePolicy:
+    updateMode: "Initial"  # Conservative for database
+  resourcePolicy:
+    containerPolicies:
+      - containerName: postgres
+        minAllowed:
+          cpu: 500m
+          memory: 1Gi
+        maxAllowed:
+          cpu: 8000m
+          memory: 32Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+
+---
+# VerticalPodAutoscaler for Redis - Production
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: redis-vpa
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: redis
+    type: vpa
+    environment: production
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: redis
+  updatePolicy:
+    updateMode: "Initial"  # Conservative for cache
+  resourcePolicy:
+    containerPolicies:
+      - containerName: redis
+        minAllowed:
+          cpu: 100m
+          memory: 512Mi
+        maxAllowed:
+          cpu: 4000m
+          memory: 16Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+
+---
+# PodDisruptionBudget for Voice Agent - Production
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: voice-agent-pdb
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+spec:
+  minAvailable: 2  # Always keep at least 2 pods running
+  selector:
+    matchLabels:
+      app: voice-agents-platform
+      component: voice-agent
+      environment: production
+
+---
+# PodDisruptionBudget for LiveKit - Production
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: livekit-pdb
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: livekit
+    environment: production
+spec:
+  maxUnavailable: 1  # Allow at most 1 pod to be unavailable
+  selector:
+    matchLabels:
+      app: voice-agents-platform
+      component: livekit
+      environment: production
+
+---
+# Custom Metrics API Configuration (for custom metrics)
+# This requires a metrics server like Prometheus Adapter
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-metrics-config
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: metrics
+data:
+  config.yaml: |
+    rules:
+      # HTTP requests per second metric
+      - seriesQuery: 'http_requests_total{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            pod: {resource: "pod"}
+        name:
+          matches: "^http_requests_total"
+          as: "http_requests_per_second"
+        metricsQuery: 'rate(http_requests_total{<<.LabelMatchers>>}[2m])'
+      
+      # WebSocket connections metric
+      - seriesQuery: 'websocket_connections{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            pod: {resource: "pod"}
+        name:
+          matches: "^websocket_connections"
+          as: "websocket_connections"
+        metricsQuery: 'websocket_connections{<<.LabelMatchers>>}'
+      
+      # Active voice sessions metric
+      - seriesQuery: 'voice_sessions_active{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            pod: {resource: "pod"}
+        name:
+          matches: "^voice_sessions_active"
+          as: "active_voice_sessions"
+        metricsQuery: 'voice_sessions_active{<<.LabelMatchers>>}'
+      
+      # LiveKit active rooms metric
+      - seriesQuery: 'livekit_rooms_active{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            pod: {resource: "pod"}
+        name:
+          matches: "^livekit_rooms_active"
+          as: "livekit_active_rooms"
+        metricsQuery: 'livekit_rooms_active{<<.LabelMatchers>>}'
+      
+      # LiveKit participants metric
+      - seriesQuery: 'livekit_participants_total{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            pod: {resource: "pod"}
+        name:
+          matches: "^livekit_participants_total"
+          as: "livekit_participants"
+        metricsQuery: 'livekit_participants_total{<<.LabelMatchers>>}'
+
+---
+# Cluster-level Autoscaling Configuration
+# Node autoscaling (requires cluster autoscaler)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler-config
+  namespace: kube-system
+  labels:
+    app: cluster-autoscaler
+data:
+  nodes.min: "3"
+  nodes.max: "20"
+  scale-down-delay-after-add: "10m"
+  scale-down-unneeded-time: "10m"
+  scale-down-utilization-threshold: "0.5"
+  skip-nodes-with-local-storage: "false"
+  skip-nodes-with-system-pods: "false"

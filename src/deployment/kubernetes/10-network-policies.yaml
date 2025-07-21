@@ -1,0 +1,659 @@
+# Network Policies for LiveKit Voice Agents Platform
+# Provides micro-segmentation and network security controls
+
+---
+# Default Deny All Network Policy - Development
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: network-policy
+    type: deny-all
+    environment: development
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Default Deny All Network Policy - Staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: network-policy
+    type: deny-all
+    environment: staging
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Default Deny All Network Policy - Production
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: network-policy
+    type: deny-all
+    environment: production
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Voice Agent Network Policy - Development
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: voice-agent-network-policy
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: allow
+    environment: development
+spec:
+  podSelector:
+    matchLabels:
+      app: voice-agents-platform
+      component: voice-agent
+      environment: development
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from NGINX load balancer
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+    # Allow metrics scraping from monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: voice-agents-monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow inter-pod communication for load balancing
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: voice-agent
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow communication to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow communication to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow communication to LiveKit
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: livekit
+      ports:
+        - protocol: TCP
+          port: 7880
+        - protocol: TCP
+          port: 7881
+        - protocol: UDP
+          port: 7882
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow external API calls (OpenAI, Anthropic, etc.)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+---
+# Voice Agent Network Policy - Production
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: voice-agent-network-policy
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    type: allow
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: voice-agents-platform
+      component: voice-agent
+      environment: production
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from NGINX load balancer
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+    # Allow metrics scraping from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: shared
+              component: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow inter-pod communication within the same deployment
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: voice-agent
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow communication to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: postgres
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow communication to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: redis
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow communication to LiveKit
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: livekit
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 7880
+        - protocol: TCP
+          port: 7881
+        - protocol: UDP
+          port: 7882
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow HTTPS external API calls only
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# PostgreSQL Network Policy - Production
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-network-policy
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: postgres
+    type: allow
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: voice-agents-platform
+      component: postgres
+      environment: production
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow connections from Voice Agent only
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: voice-agent
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow monitoring connections
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: shared
+              component: monitoring
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    # Allow DNS resolution only
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Redis Network Policy - Production
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-network-policy
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: redis
+    type: allow
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: voice-agents-platform
+      component: redis
+      environment: production
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow connections from Voice Agent and LiveKit
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: voice-agent
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 6379
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: livekit
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow monitoring connections
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: shared
+              component: monitoring
+      ports:
+        - protocol: TCP
+          port: 6379
+  egress:
+    # Allow DNS resolution only
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# LiveKit Network Policy - Production
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livekit-network-policy
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: livekit
+    type: allow
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: voice-agents-platform
+      component: livekit
+      environment: production
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow connections from Voice Agent
+    - from:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: voice-agent
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 7880
+        - protocol: TCP
+          port: 7881
+        - protocol: UDP
+          port: 7882
+    # Allow external WebRTC traffic for clients
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 7880
+        - protocol: TCP
+          port: 7881
+        - protocol: UDP
+          port: 7882
+    # Allow UDP port range for WebRTC
+    - from: []
+      ports:
+        - protocol: UDP
+          port: 50000
+        - protocol: UDP
+          port: 60000
+    # Allow monitoring connections
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: shared
+              component: monitoring
+      ports:
+        - protocol: TCP
+          port: 7880
+  egress:
+    # Allow communication to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: redis
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow external connections for WebRTC
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 1024-65535
+
+---
+# NGINX Network Policy - Production
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-network-policy
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: nginx
+    type: allow
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: voice-agents-platform
+      component: nginx
+      environment: production
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow external traffic
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+  egress:
+    # Allow communication to Voice Agent
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: voice-agent
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+    # Allow communication to LiveKit
+    - to:
+        - podSelector:
+            matchLabels:
+              app: voice-agents-platform
+              component: livekit
+              environment: production
+      ports:
+        - protocol: TCP
+          port: 7880
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Monitoring Cross-Namespace Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-network-policy
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: monitoring
+    type: allow
+    environment: shared
+spec:
+  podSelector:
+    matchLabels:
+      app: voice-agents-platform
+      component: monitoring
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow external access to monitoring dashboard
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 3000  # Grafana
+        - protocol: TCP
+          port: 9090  # Prometheus
+        - protocol: TCP
+          port: 16686 # Jaeger
+  egress:
+    # Allow scraping metrics from all voice-agents namespaces
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              app: voice-agents-platform
+      ports:
+        - protocol: TCP
+          port: 9090  # Metrics port
+        - protocol: TCP
+          port: 8080  # Application health endpoints
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Development Environment - More Relaxed Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: development-relaxed-policy
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: network-policy
+    type: relaxed
+    environment: development
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow all ingress within namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: development
+    # Allow monitoring from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: shared
+              component: monitoring
+  egress:
+    # Allow all egress for development
+    - to: []
+
+---
+# Ingress Controller Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-controller-network-policy
+  namespace: ingress-nginx
+  labels:
+    app: voice-agents-platform
+    component: ingress
+    type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow external traffic
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow communication to all voice-agents services
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              app: voice-agents-platform
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Emergency Network Policy Bypass (use with caution)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: emergency-bypass-policy
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: network-policy
+    type: emergency
+    environment: production
+  annotations:
+    description: "Emergency bypass policy - remove after troubleshooting"
+    created-by: "emergency-response-team"
+    creation-time: "manual-timestamp"
+spec:
+  podSelector:
+    matchLabels:
+      emergency-bypass: "true"  # Add this label to pods that need bypass
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from: []
+  egress:
+    - to: []

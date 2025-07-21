@@ -1,0 +1,191 @@
+# Backup Configuration for LiveKit Voice Agents Platform
+# Defines backup policies, schedules, and retention settings
+
+backup_config:
+  # Global backup settings
+  global:
+    enabled: true
+    storage_backend: s3  # Options: s3, gcs, azure, local
+    encryption: true
+    compression: true
+    parallel_jobs: 4
+    notification_channels:
+      - type: email
+        recipients:
+          - ops-team@example.com
+      - type: slack
+        webhook_url: ${SLACK_WEBHOOK_URL}
+      - type: pagerduty
+        integration_key: ${PAGERDUTY_KEY}
+    
+  # S3 storage configuration
+  s3:
+    bucket: voice-agents-backups
+    region: us-east-1
+    prefix: backups/
+    storage_class: STANDARD_IA  # Use GLACIER for long-term retention
+    server_side_encryption: AES256
+    versioning: true
+    lifecycle_rules:
+      - id: transition-to-glacier
+        days: 30
+        storage_class: GLACIER
+      - id: expire-old-backups
+        days: 365
+        action: delete
+  
+  # Backup policies for different data types
+  policies:
+    # PostgreSQL database backups
+    postgres:
+      enabled: true
+      type: database
+      schedule:
+        full_backup: "0 2 * * *"  # Daily at 2 AM
+        incremental: "0 */4 * * *"  # Every 4 hours
+        wal_archive: continuous  # Continuous WAL archiving
+      retention:
+        full_backups: 30  # Keep 30 days of full backups
+        incremental: 7  # Keep 7 days of incremental
+        wal_archives: 3  # Keep 3 days of WAL archives
+      options:
+        parallel_workers: 4
+        compression: gzip
+        checksum: true
+        include_schemas:
+          - public
+          - voice_agents
+        exclude_tables: []
+      
+    # Redis data backups
+    redis:
+      enabled: true
+      type: key-value
+      schedule:
+        snapshot: "0 */2 * * *"  # Every 2 hours
+        aof_backup: "*/30 * * * *"  # Every 30 minutes
+      retention:
+        snapshots: 7  # Keep 7 days
+        aof_files: 24  # Keep 24 hours
+      options:
+        save_rdb: true
+        save_aof: true
+        compression: lz4
+    
+    # Voice recordings and transcripts
+    voice_data:
+      enabled: true
+      type: filesystem
+      schedule:
+        full_backup: "0 3 * * *"  # Daily at 3 AM
+        incremental: "0 */6 * * *"  # Every 6 hours
+      retention:
+        recordings: 90  # Keep 90 days
+        transcripts: 365  # Keep 1 year
+      paths:
+        - /data/recordings
+        - /data/transcripts
+        - /data/conversation_history
+      options:
+        compression: zstd
+        deduplication: true
+        parallel_uploads: 8
+    
+    # Application logs
+    logs:
+      enabled: true
+      type: filesystem
+      schedule:
+        backup: "0 4 * * *"  # Daily at 4 AM
+        rotation: "0 0 * * *"  # Daily at midnight
+      retention:
+        compressed_logs: 30  # Keep 30 days
+        raw_logs: 7  # Keep 7 days locally
+      paths:
+        - /app/logs
+        - /var/log/voice-agents
+      options:
+        compression: gzip
+        filter_patterns:
+          - "*.log"
+          - "*.json"
+    
+    # Configuration files
+    configs:
+      enabled: true
+      type: filesystem
+      schedule:
+        backup: "0 */12 * * *"  # Every 12 hours
+      retention:
+        versions: 100  # Keep last 100 versions
+      paths:
+        - /app/configs
+        - /etc/voice-agents
+        - /etc/livekit
+      options:
+        version_control: true
+        encrypt_secrets: true
+    
+    # LiveKit session data
+    livekit_sessions:
+      enabled: true
+      type: multimedia
+      schedule:
+        backup: "*/15 * * * *"  # Every 15 minutes
+        cleanup: "0 5 * * *"  # Daily at 5 AM
+      retention:
+        session_data: 30  # Keep 30 days
+        recordings: 90  # Keep 90 days
+      paths:
+        - /data/livekit/sessions
+        - /data/livekit/recordings
+      options:
+        stream_processing: true
+        transcode_on_backup: false
+    
+    # Monitoring data (Prometheus/Grafana)
+    monitoring:
+      enabled: true
+      type: timeseries
+      schedule:
+        prometheus_snapshot: "0 1 * * *"  # Daily at 1 AM
+        grafana_backup: "0 */6 * * *"  # Every 6 hours
+      retention:
+        metrics: 30  # Keep 30 days
+        dashboards: unlimited  # Keep all dashboard versions
+      options:
+        compact_blocks: true
+        export_format: prometheus
+    
+  # Disaster recovery settings
+  disaster_recovery:
+    # Cross-region replication
+    replication:
+      enabled: true
+      target_regions:
+        - us-west-2
+        - eu-west-1
+      replication_lag_threshold: 300  # Alert if lag > 5 minutes
+    
+    # Recovery objectives
+    objectives:
+      rpo: 15  # Recovery Point Objective: 15 minutes
+      rto: 60  # Recovery Time Objective: 60 minutes
+      
+    # Automated failover
+    failover:
+      enabled: true
+      automatic: false  # Manual approval required
+      health_check_interval: 60
+      failure_threshold: 3
+      
+  # Backup verification
+  verification:
+    enabled: true
+    schedule:
+      daily_verify: "0 6 * * *"  # Daily at 6 AM
+      full_restore_test: "0 2 * * 0"  # Weekly on Sunday
+    test_restore:
+      sample_percentage: 10  # Test restore 10% of backups
+      target_environment: backup-test
+      cleanup_after_test: true

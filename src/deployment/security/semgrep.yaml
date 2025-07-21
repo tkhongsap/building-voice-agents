@@ -1,0 +1,262 @@
+# Semgrep Configuration for Voice Agents Platform
+# Static Application Security Testing (SAST) rules
+
+# Rule sources and rulesets
+rules:
+  # Official Semgrep rules
+  - auto  # Automatically select rules based on languages detected
+  
+  # Security-focused rulesets
+  - p/security-audit
+  - p/owasp-top-ten
+  - p/cwe-top-25
+  - p/r2c-security-audit
+  - p/python-security-audit
+  - p/javascript-security-audit
+  - p/typescript-security-audit
+  - p/docker-security-audit
+  - p/kubernetes-security-audit
+  
+  # Language-specific security rules
+  - p/python-flask
+  - p/python-django
+  - p/javascript-express
+  - p/react
+  - p/nextjs
+  
+  # Supply chain security
+  - p/supply-chain
+  - p/secrets
+  - p/dockerfile
+  
+  # Custom rules (if any)
+  # - /security/rules/custom-rules.yaml
+
+# Output configuration
+output:
+  format: json
+  destination: /security/reports/semgrep-report.json
+  
+  # Additional formats
+  additional_outputs:
+    - format: sarif
+      destination: /security/reports/semgrep-report.sarif
+    - format: text
+      destination: /security/reports/semgrep-report.txt
+    - format: gitlab-sast
+      destination: /security/reports/semgrep-gitlab.json
+
+# Performance settings
+performance:
+  max_target_bytes: 1000000  # 1MB max file size
+  timeout: 30  # 30 seconds per file
+  max_memory: 8192  # 8GB max memory
+
+# Scanning configuration
+scan:
+  # Include patterns
+  include:
+    - "*.py"
+    - "*.js"
+    - "*.ts"
+    - "*.tsx"
+    - "*.jsx"
+    - "*.yaml"
+    - "*.yml"
+    - "*.json"
+    - "Dockerfile*"
+    - "*.dockerfile"
+    - "*.tf"
+    - "*.hcl"
+  
+  # Exclude patterns
+  exclude:
+    - "node_modules/"
+    - ".git/"
+    - "venv/"
+    - ".venv/"
+    - "__pycache__/"
+    - ".pytest_cache/"
+    - "build/"
+    - "dist/"
+    - ".next/"
+    - "coverage/"
+    - "*.min.js"
+    - "*.min.css"
+    - "test/"
+    - "tests/"
+    - "**/*_test.py"
+    - "**/*_test.js"
+    - "**/*_test.ts"
+    - "**/*.test.js"
+    - "**/*.test.ts"
+    - "**/*.spec.js"
+    - "**/*.spec.ts"
+    - "docs/"
+    - "examples/"
+    - "*.lock"
+    - "package-lock.json"
+    - "yarn.lock"
+    - "Pipfile.lock"
+
+# Severity settings
+severity:
+  # Minimum severity to report
+  min_level: INFO
+  
+  # Treat warnings as errors
+  error_on_findings: false
+  
+  # Custom severity mapping
+  overrides:
+    - rule_id: "python.flask.security.xss.*"
+      severity: ERROR
+    - rule_id: "javascript.express.security.*"
+      severity: ERROR
+    - rule_id: "generic.secrets.*"
+      severity: ERROR
+
+# Rule-specific configuration
+rule_config:
+  # Secrets detection
+  secrets:
+    entropy_threshold: 3.5
+    ignore_common_test_secrets: true
+    
+  # SQL injection detection
+  sql_injection:
+    track_taint_sources: true
+    
+  # XSS detection
+  xss:
+    check_template_engines: true
+
+# Autofix settings
+autofix:
+  # Enable automatic fixes for safe rules
+  enabled: false
+  
+  # Dry run mode (show what would be fixed)
+  dry_run: true
+  
+  # Safe rules that can be auto-fixed
+  safe_rules:
+    - "python.lang.security.insecure-hash.*"
+    - "javascript.lang.security.detect-eval-with-expression"
+
+# Custom rule paths
+custom_rules:
+  paths:
+    - /security/rules/
+  
+  # Custom rule validation
+  validate: true
+
+# Integration settings
+integrations:
+  # CI/CD integration
+  ci:
+    fail_on_error: true
+    fail_on_warning: false
+    comment_on_pr: true
+  
+  # Metrics collection
+  metrics:
+    enabled: true
+    endpoint: "http://prometheus:9090/api/v1/write"
+
+# Development settings
+development:
+  # Verbose output for debugging
+  verbose: false
+  
+  # Debug mode
+  debug: false
+  
+  # Profiling
+  profile: false
+  
+  # Experimental features
+  experimental: false
+
+# Language-specific settings
+languages:
+  python:
+    # Python version for analysis
+    version: "3.11"
+    
+    # Framework detection
+    frameworks:
+      - flask
+      - django
+      - fastapi
+  
+  javascript:
+    # Node.js version
+    version: "18"
+    
+    # Framework detection
+    frameworks:
+      - express
+      - react
+      - nextjs
+  
+  typescript:
+    # TypeScript version
+    version: "5.0"
+    
+    # Type checking
+    strict_mode: true
+
+# Baseline configuration
+baseline:
+  # Baseline file to compare against
+  file: /security/baselines/semgrep-baseline.json
+  
+  # Only report new findings
+  new_only: false
+
+# Notification settings
+notifications:
+  # Slack integration
+  slack:
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#security-alerts"
+    on_findings: true
+    
+  # Email notifications
+  email:
+    smtp_server: "${SMTP_SERVER}"
+    recipients:
+      - "security@company.com"
+    on_error: true
+
+# Rule ignore patterns
+ignore:
+  # Ignore specific rules
+  rules:
+    # Example: ignore test-related security issues
+    # - "python.lang.security.audit.dangerous-system-call"
+  
+  # Ignore specific files
+  files:
+    # Example ignore patterns
+    # - "*/migrations/*"
+    # - "*/fixtures/*"
+  
+  # Ignore specific patterns in files
+  patterns:
+    # nosemgrep comments are automatically honored
+    - "# nosemgrep"
+    - "// nosemgrep"
+
+# Experimental features
+experimental:
+  # Dataflow analysis
+  dataflow: true
+  
+  # Type inference
+  type_inference: true
+  
+  # Deep scanning
+  deep_scan: false

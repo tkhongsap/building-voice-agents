@@ -1,0 +1,59 @@
+# Kubernetes Namespaces for LiveKit Voice Agents Platform
+# Provides environment separation for different deployment stages
+
+---
+# Development Environment Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: voice-agents-dev
+  labels:
+    environment: development
+    app: voice-agents-platform
+    version: v1
+  annotations:
+    description: "Development environment for LiveKit Voice Agents Platform"
+    contact: "development-team@company.com"
+
+---
+# Staging Environment Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: voice-agents-staging
+  labels:
+    environment: staging
+    app: voice-agents-platform
+    version: v1
+  annotations:
+    description: "Staging environment for LiveKit Voice Agents Platform"
+    contact: "staging-team@company.com"
+
+---
+# Production Environment Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: voice-agents-prod
+  labels:
+    environment: production
+    app: voice-agents-platform
+    version: v1
+  annotations:
+    description: "Production environment for LiveKit Voice Agents Platform"
+    contact: "production-team@company.com"
+
+---
+# Monitoring Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: voice-agents-monitoring
+  labels:
+    environment: shared
+    app: voice-agents-platform
+    component: monitoring
+    version: v1
+  annotations:
+    description: "Shared monitoring infrastructure for Voice Agents Platform"
+    contact: "devops-team@company.com"

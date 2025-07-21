@@ -1,0 +1,258 @@
+# Docker Compose configuration for LiveKit Voice Agents Platform
+# Provides complete development and testing environment
+
+version: '3.8'
+
+services:
+  # Main Voice Agent Service
+  voice-agent:
+    build:
+      context: ../../..
+      dockerfile: src/deployment/docker_config/Dockerfile
+      target: development
+    container_name: voice-agent-main
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://agent:agent_password@postgres:5432/voice_agents
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-devsecret}
+    volumes:
+      - ../../../:/app
+      - agent-logs:/app/logs
+      - agent-cache:/app/cache
+    depends_on:
+      - redis
+      - postgres
+      - livekit
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Additional Worker Instances for Load Testing
+  voice-agent-worker-1:
+    build:
+      context: ../../..
+      dockerfile: src/deployment/docker_config/Dockerfile
+      target: development
+    container_name: voice-agent-worker-1
+    ports:
+      - "8081:8080"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - WORKER_ID=worker-1
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://agent:agent_password@postgres:5432/voice_agents
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-devsecret}
+    volumes:
+      - ../../../:/app
+      - agent-logs:/app/logs
+      - agent-cache:/app/cache
+    depends_on:
+      - redis
+      - postgres
+      - livekit
+      - voice-agent
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+
+  voice-agent-worker-2:
+    build:
+      context: ../../..
+      dockerfile: src/deployment/docker_config/Dockerfile
+      target: development
+    container_name: voice-agent-worker-2
+    ports:
+      - "8082:8080"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - WORKER_ID=worker-2
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://agent:agent_password@postgres:5432/voice_agents
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-devsecret}
+    volumes:
+      - ../../../:/app
+      - agent-logs:/app/logs
+      - agent-cache:/app/cache
+    depends_on:
+      - redis
+      - postgres
+      - livekit
+      - voice-agent
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: voice-agent-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL for persistent data storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: voice-agent-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=voice_agents
+      - POSTGRES_USER=agent
+      - POSTGRES_PASSWORD=agent_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../../sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent -d voice_agents"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # LiveKit Server for WebRTC communication
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: voice-agent-livekit
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      - LIVEKIT_CONFIG=/etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7880"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: voice-agent-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: voice-agent-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: voice-agent-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+
+  # NGINX for load balancing and SSL termination
+  nginx:
+    image: nginx:alpine
+    container_name: voice-agent-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - voice-agent
+      - voice-agent-worker-1
+      - voice-agent-worker-2
+    networks:
+      - voice-agents-network
+    restart: unless-stopped
+
+# Named volumes for data persistence
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  agent-logs:
+    driver: local
+  agent-cache:
+    driver: local
+
+# Custom network for service communication
+networks:
+  voice-agents-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

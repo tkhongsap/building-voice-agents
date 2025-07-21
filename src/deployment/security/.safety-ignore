@@ -1,0 +1,22 @@
+# Safety Ignore File for Voice Agents Platform
+# Add package vulnerabilities that are acceptable risks
+
+# Format: 
+# vulnerability_id
+# OR
+# vulnerability_id[package_name]
+
+# Example ignores (uncomment and modify as needed):
+# 12345  # Low severity issue in development dependency
+# 67890[test-package]  # Specific package version issue
+
+# Development dependencies (typically not in production)
+# 39611  # Example: urllib3 vulnerability in specific version range
+
+# Note: Each ignore should include:
+# 1. Vulnerability ID
+# 2. Package name if specific to one package
+# 3. Comment explaining why it's ignored
+# 4. Review date and approval
+
+# Review these ignores quarterly to ensure they're still valid

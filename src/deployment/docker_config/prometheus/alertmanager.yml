@@ -1,0 +1,399 @@
+# AlertManager Configuration for Voice Agents Platform
+# Production-ready alerting with multiple notification channels and escalation policies
+
+global:
+  # SMTP configuration for email notifications
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alerts@voice-agents.example.com'
+  smtp_auth_username: 'alerts@voice-agents.example.com'
+  smtp_auth_password: 'your-smtp-password'
+  smtp_require_tls: true
+  
+  # Slack API URL for webhook notifications
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+  
+  # PagerDuty integration key
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  
+  # Global labels attached to all alerts
+  external_labels:
+    cluster: 'voice-agents-platform'
+    environment: '{{ .CommonLabels.environment | default "unknown" }}'
+    datacenter: 'us-west-2'
+
+# Global configuration for alert routing
+route:
+  # Root route configuration
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default-receiver'
+  
+  # Nested routes for specific alert types
+  routes:
+    # Critical alerts - immediate notification via PagerDuty and Slack
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      group_interval: 30s
+      repeat_interval: 5m
+      routes:
+        # Voice agent service down - escalate immediately
+        - match:
+            alertname: VoiceAgentServiceDown
+          receiver: 'service-down-escalation'
+          group_wait: 0s
+          repeat_interval: 2m
+        
+        # LiveKit server down - escalate immediately
+        - match:
+            alertname: LiveKitServerDown
+          receiver: 'service-down-escalation'
+          group_wait: 0s
+          repeat_interval: 2m
+    
+    # Warning alerts - Slack notifications with longer intervals
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 5m
+      group_interval: 5m
+      repeat_interval: 4h
+    
+    # Infrastructure alerts
+    - match:
+        component: infrastructure
+      receiver: 'infrastructure-alerts'
+      group_wait: 2m
+      group_interval: 2m
+      repeat_interval: 6h
+    
+    # Database alerts
+    - match_re:
+        component: '(postgres|redis)'
+      receiver: 'database-alerts'
+      group_wait: 1m
+      group_interval: 1m
+      repeat_interval: 3h
+    
+    # Performance alerts - lower priority
+    - match:
+        severity: info
+      receiver: 'performance-alerts'
+      group_wait: 10m
+      group_interval: 10m
+      repeat_interval: 24h
+    
+    # Business hours routing (weekdays 9-17 PST)
+    - match:
+        severity: critical
+      receiver: 'business-hours-critical'
+      group_wait: 0s
+      active_time_intervals:
+        - business_hours
+    
+    # After hours routing (nights and weekends)
+    - match:
+        severity: critical
+      receiver: 'after-hours-critical'
+      group_wait: 0s
+      active_time_intervals:
+        - after_hours
+
+# Time intervals for business hours routing
+time_intervals:
+  - name: business_hours
+    time_intervals:
+      - times:
+          - start_time: '09:00'
+            end_time: '17:00'
+        weekdays: ['monday:friday']
+        location: 'America/Los_Angeles'
+  
+  - name: after_hours
+    time_intervals:
+      - times:
+          - start_time: '00:00'
+            end_time: '09:00'
+        weekdays: ['monday:friday']
+        location: 'America/Los_Angeles'
+      - times:
+          - start_time: '17:00'
+            end_time: '23:59'
+        weekdays: ['monday:friday']
+        location: 'America/Los_Angeles'
+      - weekdays: ['saturday', 'sunday']
+        location: 'America/Los_Angeles'
+
+# Inhibition rules to prevent spam during cascading failures
+inhibit_rules:
+  # Inhibit warning alerts when critical alerts are firing
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['alertname', 'instance']
+  
+  # Inhibit infrastructure alerts when service is down
+  - source_matchers:
+      - alertname = "VoiceAgentServiceDown"
+    target_matchers:
+      - component = "infrastructure"
+    equal: ['instance']
+  
+  # Inhibit individual container alerts when node is down
+  - source_matchers:
+      - alertname = "NodeDown"
+    target_matchers:
+      - alertname =~ "Container.*"
+    equal: ['instance']
+
+# Receiver definitions
+receivers:
+  # Default receiver for unmatched alerts
+  - name: 'default-receiver'
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#voice-agents-alerts'
+        title: 'Voice Agents Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        color: 'warning'
+  
+  # Critical alerts receiver
+  - name: 'critical-alerts'
+    pagerduty_configs:
+      - routing_key: 'your-pagerduty-integration-key'
+        description: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        severity: 'critical'
+        details:
+          summary: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+          description: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+          component: '{{ .CommonLabels.component }}'
+          service: '{{ .CommonLabels.service }}'
+          instance: '{{ .CommonLabels.instance }}'
+          runbook_url: '{{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}'
+    
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#voice-agents-critical'
+        title: '🚨 CRITICAL: Voice Agents Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Impact:* {{ .Annotations.impact }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          *Instance:* {{ .Labels.instance }}
+          *Component:* {{ .Labels.component }}
+          {{ end }}
+        color: 'danger'
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: 'https://grafana.voice-agents.example.com/d/voice-agent-performance'
+          - type: button
+            text: 'View Runbook'
+            url: '{{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}'
+    
+    email_configs:
+      - to: 'oncall@voice-agents.example.com'
+        subject: 'CRITICAL: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          Critical alert fired for Voice Agents Platform:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Impact: {{ .Annotations.impact }}
+          Instance: {{ .Labels.instance }}
+          Component: {{ .Labels.component }}
+          Runbook: {{ .Annotations.runbook_url }}
+          
+          {{ end }}
+          
+          Please investigate immediately.
+  
+  # Service down escalation receiver
+  - name: 'service-down-escalation'
+    pagerduty_configs:
+      - routing_key: 'your-pagerduty-escalation-key'
+        description: 'URGENT: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        severity: 'critical'
+        details:
+          summary: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+          description: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+          impact: '{{ range .Alerts }}{{ .Annotations.impact }}{{ end }}'
+          component: '{{ .CommonLabels.component }}'
+          service: '{{ .CommonLabels.service }}'
+          instance: '{{ .CommonLabels.instance }}'
+    
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#voice-agents-incidents'
+        title: '🔥 SERVICE DOWN: Voice Agents Platform'
+        text: |
+          @channel URGENT: Service down detected!
+          
+          {{ range .Alerts }}
+          *Service:* {{ .Labels.service | default .Labels.component }}
+          *Alert:* {{ .Annotations.summary }}
+          *Impact:* {{ .Annotations.impact }}
+          *Instance:* {{ .Labels.instance }}
+          
+          Immediate action required!
+          {{ end }}
+        color: 'danger'
+    
+    email_configs:
+      - to: 'oncall@voice-agents.example.com,engineering-leads@voice-agents.example.com'
+        subject: 'URGENT: Service Down - {{ range .Alerts }}{{ .Labels.service | default .Labels.component }}{{ end }}'
+        body: |
+          URGENT: Service down alert for Voice Agents Platform
+          
+          {{ range .Alerts }}
+          Service: {{ .Labels.service | default .Labels.component }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Impact: {{ .Annotations.impact }}
+          Instance: {{ .Labels.instance }}
+          
+          {{ end }}
+          
+          This requires immediate attention from the on-call engineer.
+  
+  # Warning alerts receiver
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#voice-agents-warnings'
+        title: '⚠️ WARNING: Voice Agents Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Instance:* {{ .Labels.instance }}
+          *Component:* {{ .Labels.component }}
+          {{ end }}
+        color: 'warning'
+  
+  # Infrastructure alerts receiver
+  - name: 'infrastructure-alerts'
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#infrastructure-alerts'
+        title: '🏗️ Infrastructure Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Node:* {{ .Labels.instance }}
+          {{ end }}
+        color: '#ff9900'
+    
+    email_configs:
+      - to: 'infrastructure@voice-agents.example.com'
+        subject: 'Infrastructure Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          Infrastructure alert for Voice Agents Platform:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Node: {{ .Labels.instance }}
+          
+          {{ end }}
+  
+  # Database alerts receiver
+  - name: 'database-alerts'
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#database-alerts'
+        title: '🗄️ Database Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Database:* {{ .Labels.component }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        color: '#9900ff'
+    
+    email_configs:
+      - to: 'database-team@voice-agents.example.com'
+        subject: 'Database Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          Database alert for Voice Agents Platform:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Database: {{ .Labels.component }}
+          Instance: {{ .Labels.instance }}
+          
+          {{ end }}
+  
+  # Performance alerts receiver
+  - name: 'performance-alerts'
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#performance-monitoring'
+        title: '📊 Performance Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          {{ end }}
+        color: 'good'
+  
+  # Business hours critical receiver
+  - name: 'business-hours-critical'
+    pagerduty_configs:
+      - routing_key: 'your-business-hours-pagerduty-key'
+        description: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        severity: 'critical'
+    
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#voice-agents-critical'
+        title: '🚨 CRITICAL (Business Hours): Voice Agents Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Impact:* {{ .Annotations.impact }}
+          {{ end }}
+        color: 'danger'
+  
+  # After hours critical receiver
+  - name: 'after-hours-critical'
+    pagerduty_configs:
+      - routing_key: 'your-after-hours-pagerduty-key'
+        description: 'AFTER HOURS: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        severity: 'critical'
+    
+    slack_configs:
+      - api_url: '{{ .Global.slack_api_url }}'
+        channel: '#voice-agents-critical'
+        title: '🌙 CRITICAL (After Hours): Voice Agents Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Impact:* {{ .Annotations.impact }}
+          
+          After hours alert - on-call engineer notified
+          {{ end }}
+        color: 'danger'
+
+# Templates for custom message formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

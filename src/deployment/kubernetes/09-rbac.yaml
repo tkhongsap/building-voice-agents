@@ -1,0 +1,534 @@
+# RBAC (Role-Based Access Control) configurations for LiveKit Voice Agents Platform
+# ServiceAccounts, Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings
+
+---
+# ServiceAccount for Voice Agent - Development
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: voice-agent-service-account
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: development
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Voice Agent - Staging
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: voice-agent-service-account
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: staging
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Voice Agent - Production
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: voice-agent-service-account
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Supporting Services
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: supporting-services-service-account
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: supporting-services
+    environment: development
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: supporting-services-service-account
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: supporting-services
+    environment: staging
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: supporting-services-service-account
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: supporting-services
+    environment: production
+automountServiceAccountToken: false
+
+---
+# ServiceAccount for Monitoring
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: monitoring-service-account
+  namespace: voice-agents-monitoring
+  labels:
+    app: voice-agents-platform
+    component: monitoring
+    environment: shared
+automountServiceAccountToken: true
+
+---
+# Role for Voice Agent - Basic permissions within namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: voice-agent-role
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: development
+rules:
+  # Pod management
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Service discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  # ConfigMap access
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Secret access (limited)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["voice-agents-secrets"]
+  # Events for debugging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+# Role for Voice Agent - Staging
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: voice-agent-role
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: staging
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["voice-agents-secrets"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+# Role for Voice Agent - Production
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: voice-agent-role
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["voice-agents-secrets"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Horizontal Pod Autoscaler metrics
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  # Metrics access
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+
+---
+# ClusterRole for Monitoring - Cross-namespace access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring-cluster-role
+  labels:
+    app: voice-agents-platform
+    component: monitoring
+rules:
+  # Pod and service discovery across all namespaces
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "nodes"]
+    verbs: ["get", "list", "watch"]
+  # Metrics access
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+  # Custom metrics
+  - apiGroups: ["custom.metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list"]
+  # Autoscaling metrics
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  # Deployment and ReplicaSet information
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  # Ingress information
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  # Storage information
+  - apiGroups: [""]
+    resources: ["persistentvolumes", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  # ConfigMaps for monitoring configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRole for Voice Agent Metrics Collection
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: voice-agent-metrics-role
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+rules:
+  # Basic cluster information for metrics
+  - apiGroups: [""]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+  # Custom metrics publishing
+  - apiGroups: ["custom.metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "create", "update"]
+
+---
+# RoleBinding for Voice Agent - Development
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: voice-agent-role-binding
+  namespace: voice-agents-dev
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: development
+subjects:
+  - kind: ServiceAccount
+    name: voice-agent-service-account
+    namespace: voice-agents-dev
+roleRef:
+  kind: Role
+  name: voice-agent-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for Voice Agent - Staging
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: voice-agent-role-binding
+  namespace: voice-agents-staging
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: staging
+subjects:
+  - kind: ServiceAccount
+    name: voice-agent-service-account
+    namespace: voice-agents-staging
+roleRef:
+  kind: Role
+  name: voice-agent-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for Voice Agent - Production
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: voice-agent-role-binding
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+subjects:
+  - kind: ServiceAccount
+    name: voice-agent-service-account
+    namespace: voice-agents-prod
+roleRef:
+  kind: Role
+  name: voice-agent-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRoleBinding for Monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: monitoring-cluster-role-binding
+  labels:
+    app: voice-agents-platform
+    component: monitoring
+subjects:
+  - kind: ServiceAccount
+    name: monitoring-service-account
+    namespace: voice-agents-monitoring
+roleRef:
+  kind: ClusterRole
+  name: monitoring-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRoleBinding for Voice Agent Metrics (Production only)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: voice-agent-metrics-cluster-binding
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+subjects:
+  - kind: ServiceAccount
+    name: voice-agent-service-account
+    namespace: voice-agents-prod
+roleRef:
+  kind: ClusterRole
+  name: voice-agent-metrics-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ServiceAccount for Deployment and CI/CD
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployment-service-account
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: deployment
+    environment: production
+automountServiceAccountToken: true
+
+---
+# Role for Deployment - Allows CI/CD system to deploy applications
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployment-role
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: deployment
+    environment: production
+rules:
+  # Deployment management
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Service management
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # ConfigMap and Secret management (limited)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+    resourceNames: ["voice-agents-secrets", "docker-registry-secret"]
+  # Ingress management
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # HPA management
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # Pod access for troubleshooting
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # Events for deployment status
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for Deployment
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployment-role-binding
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: deployment
+    environment: production
+subjects:
+  - kind: ServiceAccount
+    name: deployment-service-account
+    namespace: voice-agents-prod
+roleRef:
+  kind: Role
+  name: deployment-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ServiceAccount for Network Policies
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: network-policy-service-account
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: network-policy
+    environment: production
+automountServiceAccountToken: false
+
+---
+# ClusterRole for Network Policy Management
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: network-policy-cluster-role
+  labels:
+    app: voice-agents-platform
+    component: network-policy
+rules:
+  # Network policy management
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Pod and namespace information for policy creation
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Security-focused ServiceAccount with minimal permissions
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: security-service-account
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: security
+    environment: production
+automountServiceAccountToken: false
+
+---
+# Role for Security Scanning and Compliance
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: security-role
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: security
+    environment: production
+rules:
+  # Read-only access for security scanning
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies", "ingresses"]
+    verbs: ["get", "list"]
+  # Security policy access
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies", "poddisruptionbudgets"]
+    verbs: ["get", "list"]
+
+---
+# RoleBinding for Security
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: security-role-binding
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: security
+    environment: production
+subjects:
+  - kind: ServiceAccount
+    name: security-service-account
+    namespace: voice-agents-prod
+roleRef:
+  kind: Role
+  name: security-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ServiceAccount Token Secret (for long-lived tokens if needed)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: voice-agent-service-account-token
+  namespace: voice-agents-prod
+  labels:
+    app: voice-agents-platform
+    component: voice-agent
+    environment: production
+  annotations:
+    kubernetes.io/service-account.name: voice-agent-service-account
+type: kubernetes.io/service-account-token
