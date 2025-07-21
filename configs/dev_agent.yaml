@@ -1,0 +1,75 @@
+# Development Agent Configuration
+# This file is used for local development and testing
+
+agent:
+  name: "Development Assistant"
+  description: "Voice agent for local development and testing"
+  version: "1.0.0"
+
+providers:
+  # Speech-to-Text Configuration
+  stt:
+    provider: "openai"
+    language: "en"
+    model: "whisper-1"
+    temperature: 0.0
+    
+  # Large Language Model Configuration  
+  llm:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    temperature: 0.7
+    max_tokens: 200
+    top_p: 1.0
+    frequency_penalty: 0.0
+    presence_penalty: 0.0
+    
+  # Text-to-Speech Configuration
+  tts:
+    provider: "openai"
+    voice: "nova"
+    speed: 1.0
+    
+  # Voice Activity Detection Configuration
+  vad:
+    provider: "silero"
+    threshold: 0.5
+    min_speech_duration_ms: 250
+    min_silence_duration_ms: 100
+
+# Development-specific settings
+development:
+  debug_mode: true
+  verbose_logging: true
+  save_conversations: true
+  conversation_log_path: "./logs/conversations.json"
+  
+# Capabilities to enable
+capabilities:
+  - turn_detection
+  - interruption_handling
+  - context_management
+
+# System prompt for the development agent
+system_prompt: |
+  You are a development assistant helping with voice agent testing.
+  
+  Keep responses concise and helpful. You are being used for development
+  and testing purposes, so focus on being responsive and easy to work with.
+  
+  If asked about your capabilities, explain that you're a development
+  version of a voice agent with basic conversation abilities.
+
+# Hot reload settings
+hot_reload:
+  enabled: true
+  watch_directories:
+    - "src"
+    - "configs"
+  exclude_patterns:
+    - "*.pyc"
+    - "__pycache__"
+    - ".git"
+    - "*.log"
+  reload_delay: 1.0
+  auto_restart: true
